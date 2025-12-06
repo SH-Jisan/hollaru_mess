@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "915406476802",
+    "project_id": "hollaru-mess",
+    "storage_bucket": "hollaru-mess.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:915406476802:android:9fa1b1b9a12ba30b5db91b",
+        "android_client_info": {
+          "package_name": "com.example.hollaru"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCS37M1vZzWvxsxEGugkZBNhpppvLgoJiY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
