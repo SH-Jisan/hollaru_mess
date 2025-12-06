@@ -4,6 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'auth/login_screen.dart';
 import 'mess_selection_screen.dart';
 
+// Tabs Import
+import 'tabs/dashboard_tab.dart';
+import 'tabs/meal_tab.dart';
+import 'tabs/bazaar_tab.dart';
+import 'tabs/profile_tab.dart';
+import 'tabs/requests_tab.dart';
+import 'tabs/components/notification_badge.dart'; // Badge Import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,126 +21,96 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final user = FirebaseAuth.instance.currentUser;
-
-  // Logout Function
-  void _logout() async {
-    await FirebaseAuth.instance.signOut();
-    // Login page e pathiye dibo
-    Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen())
-    );
-  }
+  int _selectedIndex = 0; // Current Tab Index
 
   @override
   Widget build(BuildContext context) {
-    // 1. User jodi login na thake (Safety check)
     if (user == null) return const LoginScreen();
 
-    // 2. Database theke User er tottho ana (Stream)
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance.collection('users').doc(user!.uid).snapshots(),
       builder: (context, snapshot) {
-        // Loading...
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
-        // Kono error hole
-        if (snapshot.hasError) {
-          return const Scaffold(body: Center(child: Text("Something went wrong!")));
-        }
-
-        // Data pawa gele
         if (snapshot.hasData && snapshot.data!.data() != null) {
           var userData = snapshot.data!.data() as Map<String, dynamic>;
-          String messId = userData['mess_id'] ?? ""; // mess_id check
+          String messId = userData['mess_id'] ?? "";
+          String role = userData['role'] ?? "member"; // Role check
 
-          // CASE A: User kono mess-e nai (mess_id khali)
+          // 1. Jodi Mess na thake -> Create/Join Page
           if (messId.isEmpty) {
             return const MessSelectionScreen();
           }
 
-          // CASE B: User mess-e ache (Dashboard dekhabo)
-          else {
-            return _buildDashboardView(userData);
+          // --- DYNAMIC TABS LOGIC ---
+          // Amra list gulo ekhane banabo jate 'role' onujayi filter kora jay
+
+          List<Widget> pages = [];
+          List<NavigationDestination> navItems = [];
+          List<String> titles = [];
+
+          // 1. Dashboard (Sobai dekhbe)
+          pages.add(DashboardTab(userData: userData));
+          navItems.add(const NavigationDestination(icon: Icon(Icons.dashboard), label: 'Home'));
+          titles.add("Dashboard");
+
+          // 2. Meal (Sobai dekhbe)
+          pages.add(const MealTab());
+          navItems.add(const NavigationDestination(icon: Icon(Icons.restaurant), label: 'Meal'));
+          titles.add("Meal Manager");
+
+          // 3. REQUESTS (ONLY FOR MANAGER) ***
+          if (role == 'manager') {
+            pages.add(const RequestsTab());
+            navItems.add(NavigationDestination(
+                icon: NotificationBadge(messId: messId), // Badge shoho Icon
+                label: 'Requests'
+            ));
+            titles.add("Requests & Approvals");
           }
+
+          // 4. Bazaar (Sobai dekhbe)
+          pages.add(const BazaarTab());
+          navItems.add(const NavigationDestination(icon: Icon(Icons.shopping_cart), label: 'Bazaar'));
+          titles.add("Bazaar & Accounts");
+
+          // 5. Profile (Sobai dekhbe)
+          pages.add(const ProfileTab());
+          navItems.add(const NavigationDestination(icon: Icon(Icons.person), label: 'Profile'));
+          titles.add("My Profile");
+
+          // --- SAFETY CHECK ---
+          // Role change hole jodi index out of range hoye jay
+          if (_selectedIndex >= pages.length) {
+            _selectedIndex = 0;
+          }
+
+          // 2. Main Scaffold
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(titles[_selectedIndex]), // Dynamic Title
+              backgroundColor: Colors.blueAccent,
+              foregroundColor: Colors.white,
+            ),
+
+            // Body: List theke page select korbe
+            body: pages[_selectedIndex],
+
+            // Bottom Navigation
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: _selectedIndex,
+              onDestinationSelected: (index) {
+                setState(() => _selectedIndex = index);
+              },
+              destinations: navItems, // Dynamic List pass korlam
+            ),
+          );
         }
 
         return const Scaffold(body: Center(child: Text("No Data Found")));
       },
-    );
-  }
-
-  // --- VIEW 1: Jokhon Mess Nai (Create/Join Option) ---
-  Widget _buildNoMessView() {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Welcome!"), actions: [
-        IconButton(onPressed: _logout, icon: const Icon(Icons.logout))
-      ]),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text("Apni ekhono kono Mess-e nai.", style: TextStyle(fontSize: 18)),
-              const SizedBox(height: 20),
-
-              // Create Mess Button
-              ElevatedButton.icon(
-                onPressed: () {
-                  // Pore logic dibo
-                  print("Create Mess Clicked");
-                },
-                icon: const Icon(Icons.add_home),
-                label: const Text("Create New Mess"),
-                style: ElevatedButton.styleFrom(minimumSize: const Size(200, 50)),
-              ),
-
-              const SizedBox(height: 10),
-              const Text("OR"),
-              const SizedBox(height: 10),
-
-              // Join Mess Button
-              OutlinedButton.icon(
-                onPressed: () {
-                  // Pore logic dibo
-                  print("Join Mess Clicked");
-                },
-                icon: const Icon(Icons.group_add),
-                label: const Text("Join Existing Mess"),
-                style: OutlinedButton.styleFrom(minimumSize: const Size(200, 50)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- VIEW 2: Dashboard (Jokhon Mess Ache) ---
-  Widget _buildDashboardView(Map<String, dynamic> data) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Mess Dashboard"),
-        backgroundColor: Colors.blueAccent,
-        actions: [
-          IconButton(onPressed: _logout, icon: const Icon(Icons.logout))
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("Hello, ${data['name']}", style: const TextStyle(fontSize: 24)),
-            const SizedBox(height: 10),
-            Text("Your Role: ${data['role']}", style: const TextStyle(fontSize: 18, color: Colors.grey)),
-            const SizedBox(height: 30),
-            const Text("Meal Counter Coming Soon...", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
     );
   }
 }
