@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'auth/login_screen.dart';
 import 'mess_selection_screen.dart';
+import 'tabs/components/app_drawer.dart';
 
 // Tabs Import
 import 'tabs/dashboard_tab.dart';
@@ -94,6 +95,8 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: Colors.blueAccent,
               foregroundColor: Colors.white,
             ),
+
+            drawer: const AppDrawer(),
 
             // Body: List theke page select korbe
             body: pages[_selectedIndex],

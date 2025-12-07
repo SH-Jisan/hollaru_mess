@@ -10,8 +10,13 @@ class MessSettingsScreen extends StatefulWidget {
 }
 
 class _MessSettingsScreenState extends State<MessSettingsScreen> {
-  TimeOfDay? lunchTime;
-  TimeOfDay? dinnerTime;
+  // Global Start Time
+  TimeOfDay? requestStartTime;
+
+  // Separate Deadlines
+  TimeOfDay? lunchEnd;
+  TimeOfDay? dinnerEnd;
+
   bool _isLoading = false;
 
   @override
@@ -20,60 +25,55 @@ class _MessSettingsScreenState extends State<MessSettingsScreen> {
     _loadCurrentSettings();
   }
 
-  // Ager save kora time load kora
   Future<void> _loadCurrentSettings() async {
     var doc = await FirebaseFirestore.instance.collection('messes').doc(widget.messId).get();
     if (doc.exists && doc.data() != null) {
       var data = doc.data() as Map<String, dynamic>;
       setState(() {
-        lunchTime = _stringToTime(data['lunch_deadline']);
-        dinnerTime = _stringToTime(data['dinner_deadline']);
+        requestStartTime = _stringToTime(data['request_start_time']); // Global Start
+        lunchEnd = _stringToTime(data['lunch_end_time']);
+        dinnerEnd = _stringToTime(data['dinner_end_time']);
       });
     }
   }
 
-  // String ("10:30") theke TimeOfDay banano
   TimeOfDay? _stringToTime(String? timeStr) {
     if (timeStr == null) return null;
     final parts = timeStr.split(":");
     return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
   }
 
-  // Time Select Dialog
-  Future<void> _pickTime(bool isLunch) async {
+  Future<void> _pickTime(String type) async {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
     );
     if (picked != null) {
       setState(() {
-        if (isLunch) lunchTime = picked;
-        else dinnerTime = picked;
+        if (type == 'start') requestStartTime = picked;
+        if (type == 'lunch_end') lunchEnd = picked;
+        if (type == 'dinner_end') dinnerEnd = picked;
       });
     }
   }
 
-  // Save Function
   Future<void> _saveSettings() async {
-    if (lunchTime == null || dinnerTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select both times")));
+    if (requestStartTime == null || lunchEnd == null || dinnerEnd == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please set ALL times")));
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // Time ke "HH:mm" format e save korbo (Example: "14:30")
-    String lTime = "${lunchTime!.hour}:${lunchTime!.minute}";
-    String dTime = "${dinnerTime!.hour}:${dinnerTime!.minute}";
-
     await FirebaseFirestore.instance.collection('messes').doc(widget.messId).update({
-      'lunch_deadline': lTime,
-      'dinner_deadline': dTime,
+      'request_start_time': "${requestStartTime!.hour}:${requestStartTime!.minute}",
+      'lunch_end_time': "${lunchEnd!.hour}:${lunchEnd!.minute}",
+      'dinner_end_time': "${dinnerEnd!.hour}:${dinnerEnd!.minute}",
     });
 
     setState(() => _isLoading = false);
     if(mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Deadlines Updated!")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Timing Updated!")));
       Navigator.pop(context);
     }
   }
@@ -81,41 +81,46 @@ class _MessSettingsScreenState extends State<MessSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Set Request Deadlines")),
-      body: Padding(
+      appBar: AppBar(title: const Text("Set Meal Timings")),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(20.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Set last time for Meal Off/Add:", style: TextStyle(fontSize: 16)),
-            const SizedBox(height: 20),
-
-            // Lunch Picker
+            const Text("GLOBAL START TIME", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.blue)),
+            const Text("When members can start requesting for NEXT DAY.", style: TextStyle(fontSize: 12, color: Colors.grey)),
             ListTile(
-              title: const Text("Lunch Last Time"),
-              subtitle: Text(lunchTime?.format(context) ?? "Not Set"),
-              trailing: const Icon(Icons.access_time, color: Colors.orange),
-              onTap: () => _pickTime(true),
+              title: const Text("Request Starts At"),
+              subtitle: Text(requestStartTime?.format(context) ?? "Set Start Time"),
+              trailing: const Icon(Icons.access_time, color: Colors.blue),
+              onTap: () => _pickTime('start'),
             ),
-            const Divider(),
 
-            // Dinner Picker
+            const Divider(thickness: 2),
+            const SizedBox(height: 10),
+
+            const Text("DEADLINES (Request Ends)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.red)),
+
             ListTile(
-              title: const Text("Dinner Last Time"),
-              subtitle: Text(dinnerTime?.format(context) ?? "Not Set"),
+              title: const Text("Lunch Deadline"),
+              subtitle: Text(lunchEnd?.format(context) ?? "Set End Time"),
+              trailing: const Icon(Icons.access_time, color: Colors.orange),
+              onTap: () => _pickTime('lunch_end'),
+            ),
+
+            ListTile(
+              title: const Text("Dinner Deadline"),
+              subtitle: Text(dinnerEnd?.format(context) ?? "Set End Time"),
               trailing: const Icon(Icons.access_time, color: Colors.purple),
-              onTap: () => _pickTime(false),
+              onTap: () => _pickTime('dinner_end'),
             ),
 
             const SizedBox(height: 40),
-
             _isLoading
-                ? const CircularProgressIndicator()
+                ? const Center(child: CircularProgressIndicator())
                 : SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _saveSettings,
-                child: const Text("Save Settings"),
-              ),
+              child: ElevatedButton(onPressed: _saveSettings, child: const Text("Save Settings")),
             )
           ],
         ),

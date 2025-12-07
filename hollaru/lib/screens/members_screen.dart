@@ -8,7 +8,55 @@ class MembersScreen extends StatelessWidget {
 
   const MembersScreen({super.key, required this.messId, required this.currentUserRole});
 
-  // --- KICK MEMBER LOGIC ---
+  // --- LOGIC: MAKE MANAGER (Role Swap) ---
+  Future<void> _makeManager(BuildContext context, String newManagerId, String newManagerName) async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    bool confirm = await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text("Promote $newManagerName?"),
+          content: const Text("You will lose Manager access immediately, and they will become the new Manager."),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("Confirm Change"),
+            ),
+          ],
+        )
+    ) ?? false;
+
+    if (confirm) {
+      try {
+        // 1. Update Old Manager (Me) -> Member
+        await FirebaseFirestore.instance.collection('users').doc(currentUser!.uid).update({
+          'role': 'member'
+        });
+
+        // 2. Update New Manager -> Manager
+        await FirebaseFirestore.instance.collection('users').doc(newManagerId).update({
+          'role': 'manager'
+        });
+
+        // 3. Update Mess Info (Optional, but good for tracking)
+        await FirebaseFirestore.instance.collection('messes').doc(messId).update({
+          'manager_id': newManagerId
+        });
+
+        if(context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$newManagerName is now the Manager!")));
+          Navigator.pop(context); // Go back to prevent permission issues on this screen
+        }
+
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
+    }
+  }
+
+  // --- LOGIC: KICK MEMBER ---
   Future<void> _kickMember(BuildContext context, String memberId, String memberName) async {
     bool confirm = await showDialog(
         context: context,
@@ -27,15 +75,13 @@ class MembersScreen extends StatelessWidget {
     ) ?? false;
 
     if (confirm) {
-      // 1. Remove from Mess Member List
       await FirebaseFirestore.instance.collection('messes').doc(messId).update({
         'members': FieldValue.arrayRemove([memberId])
       });
 
-      // 2. Reset User Profile
       await FirebaseFirestore.instance.collection('users').doc(memberId).update({
         'mess_id': '',
-        'role': 'member' // Reset role
+        'role': 'member'
       });
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("$memberName removed!")));
@@ -49,7 +95,6 @@ class MembersScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("Mess Members")),
       body: StreamBuilder<QuerySnapshot>(
-        // Query: Get all users who belong to this mess
         stream: FirebaseFirestore.instance
             .collection('users')
             .where('mess_id', isEqualTo: messId)
@@ -71,6 +116,7 @@ class MembersScreen extends StatelessWidget {
               String phone = data['phone'] ?? "";
 
               bool isMe = uid == currentUserId;
+              bool amIManager = currentUserRole == 'manager';
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -82,12 +128,27 @@ class MembersScreen extends StatelessWidget {
                   ),
                   title: Text(name + (isMe ? " (You)" : "")),
                   subtitle: Text(phone.isNotEmpty ? phone : role.toUpperCase()),
-                  trailing: (currentUserRole == 'manager' && !isMe)
-                      ? IconButton(
-                    icon: const Icon(Icons.person_remove, color: Colors.red),
-                    onPressed: () => _kickMember(context, uid, name),
+
+                  // TRAILING ACTIONS (Only for Manager)
+                  trailing: (amIManager && !isMe)
+                      ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // MAKE MANAGER BUTTON
+                      IconButton(
+                        icon: const Icon(Icons.star_outline, color: Colors.amber),
+                        tooltip: "Make Manager",
+                        onPressed: () => _makeManager(context, uid, name),
+                      ),
+                      // KICK BUTTON
+                      IconButton(
+                        icon: const Icon(Icons.person_remove, color: Colors.red),
+                        tooltip: "Remove Member",
+                        onPressed: () => _kickMember(context, uid, name),
+                      ),
+                    ],
                   )
-                      : null, // Managers cannot kick themselves or other managers logic can be added
+                      : null,
                 ),
               );
             },
