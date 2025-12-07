@@ -24,3 +24,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/sajib_vai.jpg
+    - assets/images/tanvir_vai.jpg
+    - assets/images/sefatullah_vai.jpg
+    - assets/images/forhad_vai.jpg
