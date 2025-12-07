@@ -3,6 +3,57 @@ import 'package:flutter/material.dart';
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
+  // --- HELPER: COMMON CARD DESIGN ---
+  Widget _buildInfoCard({
+    required String name,
+    required String dept,
+    required String session,
+    required IconData icon,
+    required Color color
+  }) {
+    return Card(
+      elevation: 3,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      child: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Row(
+          children: [
+            // Icon / Photo Placeholder
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: color.withOpacity(0.1),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(width: 15),
+
+            // Text Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Dept: $dept",
+                    style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                  ),
+                  Text(
+                    "Session: $session",
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // --- 1. ABOUT APP DIALOG ---
   void _showAboutDialog(BuildContext context) {
     showDialog(
@@ -15,20 +66,14 @@ class AppDrawer extends StatelessWidget {
             children: [
               Text("Welcome to Smart Mess Manager!", style: TextStyle(fontWeight: FontWeight.bold)),
               SizedBox(height: 10),
-              Text("🔹 Meal System:", style: TextStyle(fontWeight: FontWeight.bold)),
-              Text("- By default, everyone's meal is ON."),
-              Text("- You must turn OFF meals within the time limit set by the Manager."),
-              Text("- Start/End times are strictly followed."),
-              SizedBox(height: 10),
-              Text("🔹 Guest Meals:", style: TextStyle(fontWeight: FontWeight.bold)),
-              Text("- You can add guest meals for specific days."),
-              Text("- These will be added to your final count."),
-              SizedBox(height: 10),
-              Text("🔹 Finance:", style: TextStyle(fontWeight: FontWeight.bold)),
-              Text("- Manager adds deposits."),
-              Text("- Bazaar cost is divided by total meals at month-end."),
-              SizedBox(height: 10),
-              Text("💡 Tip: Always check the 'Dashboard' for live updates."),
+              Text("🔹 Meal System:"),
+              Text("- Turn ON/OFF meals within the manager's set time."),
+              SizedBox(height: 5),
+              Text("🔹 Guest Meals:"),
+              Text("- Add guests for specific meals (Lunch/Dinner)."),
+              SizedBox(height: 5),
+              Text("🔹 Finance:"),
+              Text("- Bazaar cost is divided equally among active meal counts."),
             ],
           ),
         ),
@@ -51,18 +96,29 @@ class AppDrawer extends StatelessWidget {
             Text("Developer Info"),
           ],
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Developed with ❤️ by:", style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
-            Text("YOUR NAME HERE", style: TextStyle(fontSize: 18, color: Colors.purple)), // আপনার নাম দিন
-            Text("(Full Stack Developer)"),
-            SizedBox(height: 15),
-            Text("Contact:", style: TextStyle(fontWeight: FontWeight.bold)),
-            Text("your.email@example.com"),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // DEVELOPER 1
+              _buildInfoCard(
+                name: "YOUR NAME", // আপনার নাম বসান
+                dept: "CSE",
+                session: "2020-2024",
+                icon: Icons.person,
+                color: Colors.purple,
+              ),
+
+              // DEVELOPER 2 (Optional)
+              _buildInfoCard(
+                name: "Co-Developer Name",
+                dept: "EEE",
+                session: "2021-2025",
+                icon: Icons.computer,
+                color: Colors.blue,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close"))
@@ -83,16 +139,38 @@ class AppDrawer extends StatelessWidget {
             Text("Dedicated To"),
           ],
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("This project is dedicated to my beloved parents and friends who supported me."),
-            SizedBox(height: 10),
-            Divider(),
-            Text("✨ My Parents", style: TextStyle(fontWeight: FontWeight.bold)),
-            Text("✨ My Messmates"),
-            Text("✨ All Bachelors struggle in Mess Life"),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // DEDICATION 1
+              _buildInfoCard(
+                name: "My Beloved Parents",
+                dept: "Home Ministry",
+                session: "Forever",
+                icon: Icons.favorite,
+                color: Colors.red,
+              ),
+
+              // DEDICATION 2
+              _buildInfoCard(
+                name: "Best Friend Name",
+                dept: "BBA",
+                session: "2019-2023",
+                icon: Icons.star,
+                color: Colors.orange,
+              ),
+
+              // DEDICATION 3
+              _buildInfoCard(
+                name: "Respectful Mentor",
+                dept: "Faculty of CSE",
+                session: "Advisor",
+                icon: Icons.school,
+                color: Colors.teal,
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Close"))
@@ -125,10 +203,7 @@ class AppDrawer extends StatelessWidget {
                     "Smart Mess Manager",
                     style: TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
                   ),
-                  Text(
-                    "Version 1.0.0",
-                    style: TextStyle(color: Colors.white70),
-                  ),
+                  Text("Version 1.0.0", style: TextStyle(color: Colors.white70)),
                 ],
               ),
             ),
@@ -148,12 +223,12 @@ class AppDrawer extends StatelessWidget {
           ),
 
           ListTile(
-            leading: const Icon(Icons.favorite_border, color: Colors.red),
+            leading: const Icon(Icons.favorite, color: Colors.red),
             title: const Text("Dedicated To"),
             onTap: () => _showDedicationDialog(context),
           ),
 
-          const Spacer(), // নিচ পর্যন্ত ধাক্কা দিবে
+          const Spacer(),
 
           const Divider(),
           const Padding(
