@@ -1,0 +1,468 @@
+================================================================================
+                             MEAL BOOK - SMART MESS
+                                PROJECT OVERVIEW
+================================================================================
+
+1. PROJECT OVERVIEW
+--------------------------------------------------------------------------------
+Meal Book (also referred to as Meal Book app) is a cross-platform mobile 
+application built using Flutter and Firebase. It is designed to simplify and 
+automate the management of shared dining facilities, commonly known as "Messes" 
+or "Hostel Messes" in South Asia (particularly in Bangladesh). 
+
+In such shared households, multiple members share meals, split grocery shopping 
+(bazaar) costs, and deposit funds periodically. Manually tracking daily meal 
+status, guest counts, shopper expenses, and calculating individual balances at 
+the end of the month is highly error-prone, tedious, and often leads to disputes.
+
+Meal Book solves this problem by providing:
+- A digital platform to log daily meals (lunch and dinner).
+- Automated calculation of daily meal counts based on member requests.
+- Transparency in tracking bazaar grocery expenses and member deposits.
+- An automated month-end calculation system that computes the meal rate and 
+  calculates whether a member has a remaining balance or owes money.
+- Push notification updates to keep all members informed of meal status changes.
+
+Target Users:
+- Mess Managers: Individuals responsible for coordinating groceries, managing 
+  member deposits, and finalizing monthly balances.
+- Mess Members: Residents of the mess who consume meals, request meals off, 
+  log guest meals, record shopping expenses, and track their financial status.
+
+
+2. MAIN FEATURES
+--------------------------------------------------------------------------------
+- Authentication & Profile Setup:
+  Users can register with their name, email, phone number, and a password. Upon 
+  first sign-in, they can choose to either create a new mess (becoming the 
+  Manager) or join an existing mess using a unique invitation code.
+  
+- Daily Meal Tracking (Lunch & Dinner):
+  Meals are turned ON by default for all active mess members to ensure ease of 
+  management. Members can request their meal to be turned "OFF" or add "GUEST" 
+  meals for lunch or dinner.
+  
+- Real-Time Requests & Approvals:
+  When members request a meal off or add guest meals, these requests are queued 
+  as "pending." The Manager reviews and approves these requests. Approving an 
+  "OFF" request decrements the meal count, and approving a "GUEST" request 
+  increments it.
+  
+- Timing Window & Cut-offs:
+  Managers can configure a global opening time and individual lunch/dinner 
+  deadlines. Once the deadline passes, meal modification buttons are locked 
+  automatically.
+  
+- Bazaar List & Expense Logging:
+  Managers create items in the bazaar list. Any member can purchase the items, 
+  enter the total cost in Taka, and mark the item as completed, which updates 
+  the total expense log.
+  
+- Deposit Tracking:
+  The Manager logs deposits paid by members, which are tracked and used at the 
+  end of the month to compute member balances.
+  
+- Live Month Statistics & Meal Log:
+  Every user can view their running monthly stats (total meals consumed, total 
+  deposited funds) and see a detailed daily history showing whether their lunch/
+  dinner was On, Off, or had guests.
+  
+- Month History:
+  Allows members to view summary sheets and details of previous closed months.
+  
+- Push Notification Alerts:
+  Uses Firebase Cloud Messaging (FCM) to broadcast alerts (e.g., when a meal is 
+  cancelled or reopened) to all members of the mess.
+
+
+3. USER ROLES
+--------------------------------------------------------------------------------
+The application supports two user roles:
+
+A. Manager
+- Permissions & Accessible Features:
+  * Full access to Dashboard, Meals, Bazaar, and Profile tabs.
+  * Access to the "Requests & Approvals" tab (to approve off/guest requests).
+  * Can create bazaar lists (add items to the shopping list).
+  * Can log member deposits (add money under member accounts).
+  * Can configure global timings (request start time, lunch and dinner deadlines).
+  * Can manage members (remove members, transfer ownership by promoting another 
+    member to Manager).
+  * Can start a new billing month or end & archive the current active month.
+  * Can reopen a cancelled/closed meal.
+- Restrictions:
+  * None.
+
+B. Member
+- Permissions & Accessible Features:
+  * Access to Dashboard, Meals, Bazaar, and Profile tabs.
+  * Can request meal off (-1) or add guest meals (+X) before deadlines.
+  * Can report "NO MEAL" in an emergency to cancel a meal (which notifies 
+    everyone).
+  * Can mark bazaar list items as purchased by entering the expense.
+  * Can view their personal stats, active month meal logs, and historical months.
+- Restrictions:
+  * Cannot access the "Requests" tab.
+  * Cannot approve meal off/guest requests.
+  * Cannot create bazaar lists (can only complete existing ones).
+  * Cannot log deposits.
+  * Cannot modify mess timings or manage other members.
+  * Cannot start/close billing months.
+  * Cannot reopen a meal once it has been closed or cancelled.
+
+
+4. APPLICATION WORKFLOW
+--------------------------------------------------------------------------------
+Step-by-step user journey:
+
+1. User Opens App 
+   ↳ Checks Firebase Auth state.
+   ↳ If NOT logged in: Directs to Login Screen.
+   ↳ If logged in: Moves to Home Screen.
+
+2. Registration / Login
+   ↳ Registration: User creates account (default role: 'member', mess_id: '').
+   ↳ Login: User authenticate using email and password.
+
+3. Mess Association (First time only)
+   ↳ If user has no active mess association (mess_id is empty):
+     ↳ Option A: Create New Mess ➔ User sets mess name ➔ Code is generated ➔ 
+       User becomes 'manager' and mess_id is set.
+     ↳ Option B: Join Mess ➔ User enters mess code ➔ User joins mess as 
+       'member' and mess_id is set.
+
+4. Home Dashboard
+   ↳ Displays Mess Name, Join Code, and Today's overview.
+   ↳ Houses the Navigation Drawer (About, Developers, Dedication, Logout).
+   ↳ Houses Bottom Navigation (Home, Meal, Requests [Manager only], Bazaar, Profile).
+
+5. Daily Operations (Meal / Bazaar)
+   ↳ Meal Tab: Auto-switches to tomorrow's date after evening start time. Users 
+     toggle meals off or add guests. Manager approves requests to update counts.
+   ↳ Bazaar Tab: Manager lists items; members buy items and enter costs. Manager 
+     adds deposit money.
+
+6. Month-End Calculations (Profile ➔ Manager Controls)
+   ↳ Manager clicks "End & Calculate Month" ➔ Reviews summary.
+   ↳ Clicks "Archive & Close Month" ➔ Mess state is set to inactive.
+   ↳ Manager can click "Start New Month" to begin a new billing cycle.
+
+7. Logout
+   ↳ User clicks Logout in Profile or Navigation Drawer ➔ Clear session.
+
+
+5. MODULE OVERVIEW
+--------------------------------------------------------------------------------
+- Authentication (screens/auth):
+  Manages account creation (`SignupScreen`) and sign-in (`LoginScreen`) using 
+  Firebase Authentication. Creates user profiles in Firestore on signup.
+
+- Mess Selection (screens/mess_selection_screen.dart):
+  Gatekeeper screen that forces unaffiliated users to either create a mess 
+  (assigns manager role) or join one using a code (assigns member role).
+
+- Navigation & Shell (screens/home_screen.dart, components/app_drawer.dart):
+  Sets up the dynamic Bottom Navigation Bar and App Drawer. Limits tab 
+  availability based on user roles.
+
+- Meal Manager (screens/tabs/meal_tab.dart, components/meal_card.dart):
+  Provides interactive widgets to request meals off, request guest meals, 
+  and report "no meal" cancellations. Displays current state based on 
+  deadlines and statuses.
+
+- Request Processing (screens/tabs/requests_tab.dart, components/notification_badge.dart):
+  Accessible only by Managers. Pulls pending meal requests for the current day 
+  and provides a transaction-safe way to approve them and update counts.
+
+- Bazaar & Accounts (screens/tabs/bazaar_tab.dart):
+  Dual-tab view separating Bazaar items (shopping lists) and Deposits. Integrates 
+  cost inputs and incremental total cost updates.
+
+- Profile & Statistics (screens/tabs/profile_tab.dart):
+  Displays personal details, role, and running monthly stats. Includes the 
+  "Manager Controls" panel for administrative settings.
+
+- Month History & Closure (screens/month_summary_screen.dart, month_history_screen.dart):
+  Calculates overall summaries, performs the financial math, archives closed 
+  months, and lists historical month logs.
+
+- Mess Settings (screens/mess_settings_screen.dart):
+  Configures global and specific deadlines (`request_start_time`, `lunch_end_time`, 
+  `dinner_end_time`) for meal management.
+
+- Notification Service (services/notification_service.dart):
+  Integrates FCM topic subscriptions (`mess_messId`) and uses a serverless 
+  HTTP legacy API approach to send push notifications.
+
+
+6. DATABASE OVERVIEW
+--------------------------------------------------------------------------------
+The project utilizes Google Cloud Firestore, a NoSQL document database. 
+The schema structure is as follows:
+
+A. Collection: `users`
+- Document ID: Firebase Auth UID
+- Fields:
+  * `uid` (String): User's unique identifier.
+  * `name` (String): Full name.
+  * `email` (String): Email address.
+  * `phone` (String): Phone number.
+  * `role` (String): User role ('member' or 'manager').
+  * `mess_id` (String): Document ID of the associated mess (empty string if none).
+  * `created_at` (Timestamp): Registration date.
+
+B. Collection: `messes`
+- Document ID: Auto-generated by Firestore
+- Fields:
+  * `mess_name` (String): Name of the mess.
+  * `mess_code` (String): Invitation code (e.g., MESS-5839).
+  * `created_by` (String): Manager's UID.
+  * `manager_id` (String): Current manager's UID.
+  * `created_at` (Timestamp): Creation date.
+  * `members` (Array of Strings): List of member UIDs.
+  * `is_month_active` (Boolean): Flag indicating if there is a running month.
+  * `current_month_id` (String): Document ID of the active month.
+  * `meal_rate` (Double): Finalized meal rate of the last closed month.
+  * `request_start_time` (String): Time when tomorrow's meals open (e.g., "17:00").
+  * `lunch_end_time` (String): Deadline for lunch changes (e.g., "02:00").
+  * `dinner_end_time` (String): Deadline for dinner changes (e.g., "12:00").
+
+C. Subcollection: `messes/{messId}/monthly_data`
+- Document ID: Unique month identifier (e.g., "Jul_2026_176829...")
+- Fields:
+  * `month_name` (String): Display name (e.g., "Jul 2026").
+  * `created_at` (Timestamp/ServerTimestamp): Starting timestamp of the month.
+  * `is_closed` (Boolean): Closure status.
+  * `total_bazaar_cost` (Number): Incremented sum of all grocery expenses.
+
+D. Subcollection: `messes/{messId}/monthly_data/{monthId}/daily_logs`
+- Document ID: Date in string format (`yyyy-MM-dd`)
+- Fields:
+  * `lunch_count` (Number): Number of lunch meals to prepare.
+  * `lunch_status` (String): 'open', 'cooking', or 'closed' (cancelled).
+  * `lunch_cancelled_by` (String): Name of user who reported no lunch (if closed).
+  * `dinner_count` (Number): Number of dinner meals to prepare.
+  * `dinner_status` (String): 'open', 'cooking', or 'closed' (cancelled).
+  * `dinner_cancelled_by` (String): Name of user who reported no dinner (if closed).
+  * `requests` (Map): Map of member request details. Key is the member UID (for 
+    meal off) or a guest key (`${uid}_guest_${timestamp}`).
+    * Fields inside request:
+      - `name` (String): Name of the requester.
+      - `type` (String): Meal type ('lunch' or 'dinner').
+      - `category` (String): Request type ('off' or 'guest').
+      - `count` (Number): Number of guest meals (only present if category is 'guest').
+      - `status` (String): 'pending' or 'approved'.
+      - `requested_by` (String): Member UID (only for category 'guest').
+      - `timestamp` (Timestamp): Request creation time.
+
+E. Subcollection: `messes/{messId}/monthly_data/{monthId}/bazaar_items`
+- Document ID: Auto-generated
+- Fields:
+  * `items` (String): List of items to purchase.
+  * `cost` (Number): Total expense (0 if pending).
+  * `status` (String): 'pending' or 'completed'.
+  * `added_by` (String): UID of manager who listed the items.
+  * `date` (Timestamp): Creation time.
+  * `shopper_id` (String): UID of member who purchased items.
+  * `shopper_name` (String): Name of member who purchased items.
+
+F. Subcollection: `messes/{messId}/monthly_data/{monthId}/deposits`
+- Document ID: Auto-generated
+- Fields:
+  * `member_id` (String): UID of the depositing member.
+  * `member_name` (String): Name of the member.
+  * `amount` (Number): Deposited sum in Taka.
+  * `date` (Timestamp): Timestamp of the deposit transaction.
+
+
+7. API OVERVIEW
+--------------------------------------------------------------------------------
+The application interacts directly with Firebase services (Client-SDK) and has 
+no standalone API server.
+
+- Firebase Auth APIs:
+  * `createUserWithEmailAndPassword()`: Registers new users.
+  * `signInWithEmailAndPassword()`: Authenticates returning users.
+  * `signOut()`: Terminates sessions.
+  * `authStateChanges()`: Stream used in `main.dart` to toggle login states.
+
+- Firestore Database Operations:
+  * `.snapshots()` Streams: Used throughout the app to stream real-time updates 
+    for users, messes, daily logs, bazaar items, and deposits.
+  * Transaction-safe updates (`runTransaction`): Used in `requests_tab.dart` 
+    to ensure that when a request is approved, the request state changes and the 
+    meal count increments/decrements atomically.
+  * Collection References:
+    - `users`: Read/write profile configuration.
+    - `messes`: Read/write mess details and metadata.
+    - `messes/{id}/monthly_data`: Historical logs, month data.
+    - `messes/{id}/monthly_data/{mid}/daily_logs`: Main engine for daily counts.
+    - `messes/{id}/monthly_data/{mid}/bazaar_items`: Tracks shared expense lists.
+    - `messes/{id}/monthly_data/{mid}/deposits`: Logs prefunded balances.
+
+- Push Notifications Gateway:
+  * Legacy HTTP FCM Endpoint: `https://fcm.googleapis.com/fcm/send`. The app sends 
+    a POST request with JSON payload to broadcast meal cancellations/updates 
+    to all subscribers of a mess's topic (`mess_messId`).
+  * `FirebaseMessaging.subscribeToTopic()`: Subscribes devices to mess broadcasts.
+
+
+8. TECHNOLOGIES USED
+--------------------------------------------------------------------------------
+- Frontend Mobile Framework: Flutter (Dart SDK >= 3.10.0)
+- Backend Database: Cloud Firestore (NoSQL)
+- Authentication: Firebase Authentication
+- Cloud Messaging: Firebase Cloud Messaging (FCM)
+- Local Notifications: `flutter_local_notifications` (for foreground display)
+- HTTP Networking: `http` package (for sending legacy push notifications)
+- Date & Time Formatting: `intl` package
+- Icon Library: `cupertino_icons` & Material Icons
+- Build Tooling: Flutter build utilities (iOS/Android/Windows/Web/Linux/macOS)
+
+
+9. PROJECT STRUCTURE
+--------------------------------------------------------------------------------
+The Flutter project directory contains the following layout:
+
+hollaru/
+├── assets/                     # Static images used for dedication/credits
+│   └── images/                 # Contains pictures of the dedications
+├── android/                    # Android-specific build and configuration files
+├── ios/                        # iOS-specific build and configuration files
+├── test/                       # Contains unit and widget test files
+│   └── widget_test.dart        # Standard widget test boilerplate
+└── lib/                        # Core application source files
+    ├── main.dart               # Entry point, initializes Firebase & services
+    ├── services/
+    │   └── notification_service.dart # Handles local & FCM push notifications
+    └── screens/
+        ├── home_screen.dart    # Main screen with navigation and role checks
+        ├── members_screen.dart # Manage mess members list (Manager panel)
+        ├── mess_selection_screen.dart # Initial Screen to create/join a mess
+        ├── mess_settings_screen.dart  # Edit meal timings & cut-offs
+        ├── month_history_screen.dart  # View past billing month summaries
+        ├── month_summary_screen.dart  # Summary report and month closure math
+        ├── auth/
+        │   ├── login_screen.dart      # Standard email login page
+        │   └── signup_screen.dart     # Standard registration page
+        └── tabs/
+            ├── bazaar_tab.dart        # Handles Bazaar lists and Deposits
+            ├── dashboard_tab.dart     # Main home tab showing join codes and placeholders
+            ├── meal_tab.dart          # Shows date selectors and active meal cards
+            ├── profile_tab.dart       # User details, stats, and manager menu
+            ├── requests_tab.dart      # Manager panel to approve pending requests
+            └── components/
+                ├── app_drawer.dart    # Contains App info, developers, and rules
+                ├── manager_sheet.dart # Unused component for meal status overrides
+                ├── meal_card.dart     # Custom card displaying status and buttons
+                └── notification_badge.dart # Red badge for pending request tabs
+
+
+10. KEY BUSINESS LOGIC
+--------------------------------------------------------------------------------
+- Default Meal State:
+  Every active member of the mess is assumed to consume 1 meal per session (lunch 
+  and dinner). When a daily log sheet is generated, the defaults are:
+  `lunch_count = total members`, `dinner_count = total members`.
+
+- Request Off vs. Guest Meals:
+  * To opt out of a meal, a member requests "OFF" (Count adjusts -1 upon approval).
+  * To host guests, a member requests "GUEST" with a count (Count adjusts +count).
+  * Only when the Manager approves the requests do the counts update in the DB.
+
+- Date Shift Rule:
+  In the `MealTab`, if the current time exceeds the global `request_start_time` 
+  (e.g., 17:00 / 5 PM), the active date automatically jumps to tomorrow's date. 
+  This prevents members from modifying logs for the current day's dinner late.
+
+- Deadline Enforcement:
+  * If current time is before the start window (17:00 of the previous day): 
+    The meal is in "WAITING" state and locked.
+  * If current time is after the end deadline (e.g., 02:00 for lunch, 12:00 for 
+    dinner): The meal enters "COOKING" state and is auto-locked.
+  * Otherwise, the meal is "OPEN" for modifications.
+
+- Emergency Cancellation (Report No Meal):
+  If a member reports "NO MEAL", the status instantly overrides to "CANCELLED", 
+  count is set to 0, and the name of the canceller is recorded. Everyone gets a 
+  push notification. Only the Manager can undo this.
+
+- Financial Calculation Math (Month Closure):
+  * Total Bazaar Cost = Sum of all completed bazaar item costs.
+  * Member Meals = (1 if not OFF, else 0) + (Approved guest meals) summed over 
+    all daily logs where status != 'closed'.
+  * Total Mess Meals = Sum of all members' meals.
+  * Meal Rate = Total Bazaar Cost / Total Mess Meals.
+  * Member Cost = Member Meals * Meal Rate.
+  * Member Balance = Member Deposit - Member Cost.
+    - Negative balance: Member owes the mess money (Due).
+    - Positive balance: Member has surplus funds remaining (Refundable).
+
+
+11. IMPORTANT WORKFLOWS
+--------------------------------------------------------------------------------
+A. User Onboarding
+   1. User completes signup. Firestore record created in `users` collection.
+   2. User logs in. Auth state triggers redirection to `HomeScreen`.
+   3. If `mess_id` is empty:
+      * Creating a Mess: Prompts name, generates unique `MESS-xxxx` code, updates 
+        user role to `'manager'`, sets `mess_id`.
+      * Joining a Mess: User enters code, queries `messes` collection, updates 
+        user role to `'member'`, pushes user UID to the mess's member array.
+
+B. Requesting Meal Modifications
+   1. Member enters `MealTab` (date might auto-shift to tomorrow).
+   2. Member presses "OFF (-1)" or "Guest (+)" and inputs count.
+   3. A pending request document is merged under the `requests` map in the 
+      date's daily log document.
+   4. Manager opens the "Requests" tab, filters by lunch/dinner, reviews pending 
+      items, and taps "Approve".
+   5. A transaction updates the request status to `'approved'` and modifies the 
+      `lunch_count` or `dinner_count` atomically.
+
+C. Recording Expenses & Deposits
+   1. Manager creates a bazaar list item.
+   2. A member buys the item, taps the cart icon, enters the cost in Taka, and 
+      confirms. The item state becomes `'completed'`, and `total_bazaar_cost` 
+      is incremented.
+   3. Manager logs a deposit: opens deposit dialog, inputs amount. Document 
+      is added to `deposits` collection.
+
+D. Month Calculations & Finalization
+   1. Manager goes to Profile ➔ "End & Calculate Month".
+   2. App reads all database records under the current `monthId` subcollections 
+      (daily logs, deposits, bazaar items), runs calculations in memory, and 
+      displays the summary.
+   3. Manager presses "Archive & Close Month" to deactivate the month and save 
+      the final meal rate.
+
+
+12. EXTERNAL SERVICES
+--------------------------------------------------------------------------------
+- Google Firebase Authentication: Used for user login, signup, and session state.
+- Google Cloud Firestore: Handles real-time document storage for messes, 
+  months, daily logs, expense lists, and deposits.
+- Google Firebase Cloud Messaging (FCM): Facilitates push notification 
+  broadcasts for updates.
+
+
+13. OVERALL SUMMARY
+--------------------------------------------------------------------------------
+Meal Book is a serverless, real-time shared dining management app built 
+using Flutter and Firebase. It eliminates the manual, error-prone record-keeping 
+usually managed on paper in shared student messes.
+
+Key Strengths:
+- Fully Serverless: Direct client integration with Firebase Firestore eliminates 
+  the need for maintaining a separate backend hosting environment.
+- Dynamic Timings & Locks: Auto-dateshift and time-based request locking prevent 
+  manipulations of meal entries after cooking hours have started.
+- Real-time Sync & Notifications: Direct Firestore streams ensure changes are 
+  immediately synchronized, and FCM notifies members of critical updates.
+- Robust Calculation Engine: Memory-safe calculation of meal rates, deposits, 
+  and balances during month-end reviews.
+
+Primary Purpose:
+To establish transparency, structure, and ease of calculations in shared hostels 
+and student messes by digitalizing daily meals, bazaar expenses, and balances.
+================================================================================

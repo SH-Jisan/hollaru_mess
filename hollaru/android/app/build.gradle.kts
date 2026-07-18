@@ -10,7 +10,22 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
+    defaultConfig {
+        // Unique app id
+        applicationId = "com.example.hollaru"
+
+        // Flutter plugin theke asbe (usually minSdk 23, firebase er jonno ok)
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    // Java / Kotlin config + desugaring
     compileOptions {
+        // JDK 8+ features use korar jonno
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -19,26 +34,24 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
-    defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.hollaru"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-    }
-
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // এখন debug keystore diye sign, pore play store er jonno nijer keystore use korba
             signingConfig = signingConfigs.getByName("debug")
+            // Proguard/Minify chai le pore add korte parba
+            // isMinifyEnabled = false
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Flutter/Android-er base support
+    implementation("androidx.core:core-ktx:1.13.1")
+
+    // Desugaring libs (JDK new API support er jonno)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

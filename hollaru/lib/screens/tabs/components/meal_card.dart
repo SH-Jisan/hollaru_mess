@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
+import '../../../services/notification_service.dart';
+
 class MealCard extends StatelessWidget {
   final String type;
   final Color color;
@@ -29,50 +31,39 @@ class MealCard extends StatelessWidget {
     required this.endTime,
   });
 
-  // --- UNIVERSAL CYCLE LOGIC ---
+  // --- TIME STATUS ---
   int _getTimeStatus() {
     try {
       DateTime now = DateTime.now();
-      DateTime mealDate = DateTime.parse(date); // Target Meal Date (Example: 8th)
+      DateTime mealDate = DateTime.parse(date);
 
-      // 1. WINDOW START (সব সময় আগের দিন)
-      // Example: 8 তারিখের মিলের জন্য সাইকেল শুরু হবে 7 তারিখ বিকাল ৫টায়
+      // Start Time (Previous Day)
       List<String> startParts = startTime.split(":");
       DateTime windowStart = DateTime(
           mealDate.year, mealDate.month, mealDate.day - 1,
           int.parse(startParts[0]), int.parse(startParts[1])
       );
 
-      // 2. DEADLINE CALCULATION (Smart Cycle Check)
+      // End Time (Smart Logic)
       List<String> endParts = endTime.split(":");
       int endHour = int.parse(endParts[0]);
       int endMinute = int.parse(endParts[1]);
+      DateTime windowEnd;
 
-      // প্রথমে ধরে নেই ডেডলাইনটি আগের দিনেই (7 তারিখ)
-      DateTime calculatedDeadline = DateTime(
-          mealDate.year, mealDate.month, mealDate.day - 1,
-          endHour, endMinute
-      );
-
-      // চেক: যদি দেখি ডেডলাইনটি "Window Start" এর আগেই পড়ে গেছে,
-      // তার মানে এটি আসলে পরের দিনের (8 তারিখের) সময়।
-      // Example: Start 17:00 (5 PM). Deadline 02:00 (2 AM).
-      // 7th 2 AM < 7th 5 PM. তাই এটি হবে 8th 2 AM.
-      if (calculatedDeadline.isBefore(windowStart)) {
-        calculatedDeadline = calculatedDeadline.add(const Duration(days: 1));
+      if (type == 'lunch' && endHour >= 15) {
+        windowEnd = DateTime(mealDate.year, mealDate.month, mealDate.day - 1, endHour, endMinute);
+      } else {
+        windowEnd = DateTime(mealDate.year, mealDate.month, mealDate.day, endHour, endMinute);
       }
 
-      // 3. Comparison
-      if (now.isBefore(windowStart)) return 1; // Too Early (সাইকেল শুরু হয়নি)
-      if (now.isAfter(calculatedDeadline)) return 2; // Time Over (ডেডলাইন পার)
-
+      if (now.isBefore(windowStart)) return 1; // Waiting
+      if (now.isAfter(windowEnd)) return 2;    // Time Over
       return 0; // Open
     } catch (e) {
       return 0;
     }
   }
 
-  // --- HELPER: Display Time ---
   String _formatTime(String time24) {
     try {
       final parts = time24.split(":");
@@ -83,7 +74,7 @@ class MealCard extends StatelessWidget {
     }
   }
 
-  // --- DB ACTIONS (Same as before) ---
+  // --- DB ACTIONS ---
   Future<void> _requestMealOff(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     await FirebaseFirestore.instance
@@ -153,12 +144,72 @@ class MealCard extends StatelessWidget {
     );
   }
 
+  // --- CANCEL MEAL (MEMBER/MANAGER BOTH) ---
+  Future<void> _reportNoMeal(BuildContext context, String currentStatus) async {
+    final user = FirebaseAuth.instance.currentUser;
+    // নাম বের করার জন্য ইউজার প্রোফাইল থেকে ডিসপ্লে নেম নেওয়া ভালো,
+    // তবে এখানে শর্টকাটে FirebaseAuth এর নাম নিচ্ছি।
+    String reporterName = user?.displayName ?? "A Member";
+
+    // যদি অলরেডি ক্লোজ থাকে, তবে কেবল ম্যানেজার খুলতে পারবে
+    if (currentStatus == 'closed' && role != 'manager') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Only Manager can re-open meal.")));
+      return;
+    }
+
+    String newStatus = currentStatus == 'closed' ? 'open' : 'closed';
+
+    bool confirm = await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(newStatus == 'closed' ? "Report NO MEAL?" : "Re-open Meal?"),
+          content: Text(newStatus == 'closed'
+              ? "Everyone will be notified that meal is cancelled by YOU ($reporterName)."
+              : "Meal will be active again."),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("No")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: newStatus == 'closed' ? Colors.red : Colors.green, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("Yes, Update"),
+            )
+          ],
+        )
+    ) ?? false;
+
+    if (confirm) {
+      await FirebaseFirestore.instance
+          .collection('messes').doc(messId)
+          .collection('monthly_data').doc(monthId)
+          .collection('daily_logs').doc(date)
+          .set({
+        '${type}_status': newStatus,
+        if(newStatus == 'closed') '${type}_count': 0,
+        // কে ক্যান্সেল করল তার নাম সেভ করছি
+        if(newStatus == 'closed') '${type}_cancelled_by': reporterName
+      }, SetOptions(merge: true));
+      String notifBody = newStatus == 'closed'
+          ? "Alert! $type has been CANCELLED by $reporterName."
+          : "Update: $type has been RE-OPENED.";
+
+      await NotificationService.sendPushNotification(
+          messId: messId,
+          title: "Meal Update 📢",
+          body: notifBody
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    int count = logData['${type}_count'] ?? 0;
 
-    // Time Check
+    // DB Status
+    String status = logData['${type}_status'] ?? 'open';
+    int count = logData['${type}_count'] ?? 0;
+    String cancelledBy = logData['${type}_cancelled_by'] ?? "Manager"; // কে ক্যান্সেল করেছে
+
+    // Time Logic
     int timeState = _getTimeStatus();
 
     // UI Variables
@@ -168,40 +219,34 @@ class MealCard extends StatelessWidget {
     String infoText = "";
     Color infoColor = Colors.grey;
 
-    // Deadline Display Logic (UI তে দেখানোর জন্য)
-    String endDisplay = _formatTime(endTime);
-    // UI তেও লজিক অ্যাপ্লাই করে দেখাবো "Prev Day" কিনা
-    try {
-      List<String> startParts = startTime.split(":");
-      List<String> endParts = endTime.split(":");
-      // যদি End Hour < Start Hour হয়, তবে এটি পরের দিন (Same Day of Meal)
-      // যদি End Hour > Start Hour হয় (যেমন রাত ৮টা), তবে এটি আগের দিন (Prev Day)
-      if (int.parse(endParts[0]) > int.parse(startParts[0])) {
-        endDisplay = "Prev Day $endDisplay";
-      }
-    } catch (_) {}
-
-
-    if (timeState == 1) {
-      // Too Early
-      infoText = "Starts: Prev Day ${_formatTime(startTime)}";
-      infoColor = Colors.orange;
-      displayStatus = "WAITING";
-      chipColor = Colors.orange;
-      isLocked = true;
-    } else if (timeState == 2) {
-      // Time Over
-      infoText = "Closed (Ended $endDisplay)";
+    // --- PRIORITY LOGIC ---
+    if (status == 'closed') {
+      displayStatus = "CANCELLED";
+      chipColor = Colors.red;
+      // এখানে দেখাবে কে বন্ধ করেছে
+      infoText = "Cancelled by: $cancelledBy";
       infoColor = Colors.red;
+      isLocked = true;
+    }
+    else if (timeState == 2) {
       displayStatus = "COOKING";
       chipColor = Colors.green;
-      isLocked = true;
-    } else {
-      // Open
-      infoText = "Open until $endDisplay";
+      infoText = "Auto-Locked (Ended ${_formatTime(endTime)})";
       infoColor = Colors.green;
+      isLocked = true;
+    }
+    else if (timeState == 1) {
+      displayStatus = "WAITING";
+      chipColor = Colors.orange;
+      infoText = "Starts: Prev Day ${_formatTime(startTime)}";
+      infoColor = Colors.orange;
+      isLocked = true;
+    }
+    else {
       displayStatus = "OPEN";
       chipColor = Colors.blue;
+      infoText = "Open until ${_formatTime(endTime)}";
+      infoColor = Colors.green;
       isLocked = false;
     }
 
@@ -209,8 +254,6 @@ class MealCard extends StatelessWidget {
     var myRequest = rawRequests[user!.uid];
     bool iRequestedOff = myRequest != null && myRequest['type'] == type && myRequest['category'] == 'off';
     String myRequestStatus = iRequestedOff ? myRequest['status'] : '';
-
-    bool isActionDisabled = isLocked;
 
     return Card(
       elevation: 4,
@@ -248,13 +291,12 @@ class MealCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // COUNT DISPLAY
             Text(
-                isLocked ? "Final Count: $count" : "Current Count: $count",
+                status == 'closed' ? "Meal Off" : (isLocked ? "Final Count: $count" : "Current Count: $count"),
                 style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: isLocked ? Colors.green : Colors.black
+                    color: status == 'closed' ? Colors.red : (isLocked ? Colors.green : Colors.black)
                 )
             ),
 
@@ -264,22 +306,37 @@ class MealCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // 1. OFF BUTTON
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: (isActionDisabled || iRequestedOff) ? null : () => _requestMealOff(context),
+                    onPressed: (isLocked || iRequestedOff) ? null : () => _requestMealOff(context),
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                     child: Text(iRequestedOff ? "$myRequestStatus" : "OFF (-1)"),
                   ),
                 ),
                 const SizedBox(width: 10),
 
+                // 2. GUEST BUTTON
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: isActionDisabled ? null : () => _requestGuestMeal(context),
+                    onPressed: isLocked ? null : () => _requestGuestMeal(context),
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.green),
                     child: const Text("Guest (+)"),
                   ),
                 ),
+
+                // 3. REPORT/CANCEL BUTTON (FOR EVERYONE)
+                // মিল চালু থাকলে বাটনটি দেখাবে (যাতে মেম্বাররা বন্ধ করতে পারে)
+                // মিল বন্ধ থাকলে শুধুমাত্র ম্যানেজার বাটনটি দেখবে (চালু করার জন্য)
+                if (status != 'closed' || role == 'manager')
+                  IconButton(
+                    icon: Icon(
+                        status == 'closed' ? Icons.settings_backup_restore : Icons.warning_amber_rounded,
+                        color: status == 'closed' ? Colors.green : Colors.orange
+                    ),
+                    tooltip: status == 'closed' ? "Re-open Meal" : "Report No Meal",
+                    onPressed: () => _reportNoMeal(context, status),
+                  )
               ],
             )
           ],

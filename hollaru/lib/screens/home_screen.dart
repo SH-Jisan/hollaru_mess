@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/notification_service.dart';
 import 'auth/login_screen.dart';
 import 'mess_selection_screen.dart';
 import 'tabs/components/app_drawer.dart';
@@ -38,6 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
         if (snapshot.hasData && snapshot.data!.data() != null) {
           var userData = snapshot.data!.data() as Map<String, dynamic>;
           String messId = userData['mess_id'] ?? "";
+          if (messId.isNotEmpty) {
+            NotificationService.subscribeToMess(messId);
+          }
           String role = userData['role'] ?? "member"; // Role check
 
           // 1. Jodi Mess na thake -> Create/Join Page

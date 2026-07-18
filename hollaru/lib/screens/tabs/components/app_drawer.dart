@@ -303,7 +303,7 @@ class AppDrawer extends StatelessWidget {
                       SizedBox(height: 15),
                       // Removed Flexible to avoid unintended shrinking
                       Text(
-                        "Hollaru Manager", 
+                        "Meal Book", 
                         style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 0.5),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
