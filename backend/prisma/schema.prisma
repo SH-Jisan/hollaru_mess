@@ -1,13 +1,114 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
-generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
-}
-
 datasource db {
   provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  MEMBER
+  MANAGER
+}
+
+enum MealStatus {
+  OPEN
+  COOKING
+  CANCELLED
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  role      Role     @default(MEMBER)
+  messId    String?
+  mess      Mess?    @relation(fields: [messId], references: [id], onDelete: SetNull)
+  deposits  Deposit[]
+  requests  MealRequest[]
+  createdAt DateTime @default(now())
+}
+
+model Mess {
+  id               String         @id @default(uuid())
+  name             String
+  code             String         @unique
+  managerId        String
+  members          User[]
+  isMonthActive    Boolean        @default(false)
+  currentMonthId   String?
+  monthlyData      MonthlyData[]
+  requestStartTime String         @default("17:00") // Time when next day request opens
+  lunchEndTime     String         @default("02:00") // Cutoff for Lunch
+  dinnerEndTime    String         @default("12:00") // Cutoff for Dinner
+  createdAt        DateTime       @default(now())
+}
+
+model MonthlyData {
+  id              String       @id @default(uuid())
+  monthName       String       // e.g., "July 2026"
+  messId          String
+  mess            Mess         @relation(fields: [messId], references: [id], onDelete: Cascade)
+  isClosed        Boolean      @default(false)
+  totalBazaarCost Float        @default(0.0)
+  dailyLogs       DailyLog[]
+  bazaarItems     BazaarItem[]
+  deposits        Deposit[]
+  createdAt       DateTime     @default(now())
+}
+
+model DailyLog {
+  id            String         @id @default(uuid()) // formatted as YYYY-MM-DD
+  monthId       String
+  month         MonthlyData    @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  lunchCount    Int            @default(0)
+  lunchStatus   MealStatus     @default(OPEN)
+  lunchCancelledBy String?
+  dinnerCount   Int            @default(0)
+  dinnerStatus  MealStatus     @default(OPEN)
+  dinnerCancelledBy String?
+  requests      MealRequest[]
+  createdAt     DateTime       @default(now())
+}
+
+model MealRequest {
+  id          String         @id @default(uuid())
+  logId       String
+  log         DailyLog       @relation(fields: [logId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String         // "LUNCH" or "DINNER"
+  category    String         // "OFF" or "GUEST"
+  count       Int            @default(1) // 1 for OFF, X for Guests
+  status      RequestStatus  @default(PENDING)
+  createdAt   DateTime       @default(now())
+}
+
+model BazaarItem {
+  id           String        @id @default(uuid())
+  monthId      String
+  month        MonthlyData   @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  items        String
+  cost         Float         @default(0.0)
+  status       String        @default("PENDING") // PENDING or COMPLETED
+  shopperId    String?
+  shopperName  String?
+  createdAt    DateTime      @default(now())
+}
+
+model Deposit {
+  id         String          @id @default(uuid())
+  monthId    String
+  month      MonthlyData     @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount     Float
+  createdAt  DateTime        @default(now())
 }
