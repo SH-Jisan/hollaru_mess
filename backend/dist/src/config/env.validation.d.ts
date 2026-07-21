@@ -1,0 +1,16 @@
+declare enum Environment {
+    Development = "development",
+    Production = "production",
+    Test = "test"
+}
+declare class EnvironmentVariables {
+    NODE_ENV: Environment;
+    PORT: number;
+    DATABASE_URL: string;
+    JWT_ACCESS_SECRET: string;
+    JWT_ACCESS_EXPIRATION: string;
+    JWT_REFRESH_SECRET: string;
+    JWT_REFRESH_EXPIRATION: string;
+}
+export declare function validate(config: Record<string, any>): EnvironmentVariables;
+export {};
