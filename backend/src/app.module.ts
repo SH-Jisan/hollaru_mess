@@ -10,6 +10,7 @@ import { MessModule } from './modules/mess/mess.module';
 import { MealsModule } from './modules/meals/meals.module';
 import { BazaarModule } from './modules/bazaar/bazaar.module';
 import { BillingModule } from './modules/billing/billing.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { BillingModule } from './modules/billing/billing.module';
     MessModule,
     MealsModule,
     BazaarModule,
-    BillingModule
+    BillingModule,
+    NotificationModule
   ],
   controllers: [AppController],
   providers: [AppService],

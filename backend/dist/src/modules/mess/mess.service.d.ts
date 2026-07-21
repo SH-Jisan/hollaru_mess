@@ -9,8 +9,9 @@ export declare class MessService {
     private cacheManager;
     constructor(prisma: PrismaService, validator: ContextValidatorService, cacheManager: Cache);
     createMess(dto: CreateMessDto, userId: string): Promise<{
-        id: string;
         name: string;
+        id: string;
+        createdAt: Date;
         code: string;
         managerId: string;
         isMonthActive: boolean;
@@ -18,7 +19,6 @@ export declare class MessService {
         requestStartTime: string;
         lunchEndTime: string;
         dinnerEndTime: string;
-        createdAt: Date;
     }>;
     joinMess(dto: JoinMessDto, userId: string): Promise<{
         message: string;

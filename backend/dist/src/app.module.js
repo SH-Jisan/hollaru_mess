@@ -19,6 +19,7 @@ const mess_module_1 = require("./modules/mess/mess.module");
 const meals_module_1 = require("./modules/meals/meals.module");
 const bazaar_module_1 = require("./modules/bazaar/bazaar.module");
 const billing_module_1 = require("./modules/billing/billing.module");
+const notification_module_1 = require("./modules/notification/notification.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -39,7 +40,8 @@ exports.AppModule = AppModule = __decorate([
             mess_module_1.MessModule,
             meals_module_1.MealsModule,
             bazaar_module_1.BazaarModule,
-            billing_module_1.BillingModule
+            billing_module_1.BillingModule,
+            notification_module_1.NotificationModule
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

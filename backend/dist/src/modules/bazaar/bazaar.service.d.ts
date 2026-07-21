@@ -11,30 +11,30 @@ export declare class BazaarService {
     constructor(prisma: PrismaService, validator: ContextValidatorService, cacheManager: Cache);
     createBazaarItem(dto: CreateBazaarItemDto, userId: string): Promise<{
         id: string;
+        createdAt: Date;
         items: string;
-        cost: number;
+        monthId: string;
         status: string;
+        cost: number;
         shopperId: string | null;
         shopperName: string | null;
-        createdAt: Date;
-        monthId: string;
     }>;
     completePurchase(itemId: string, dto: CompletePurchaseDto, userId: string): Promise<{
         id: string;
+        createdAt: Date;
         items: string;
-        cost: number;
+        monthId: string;
         status: string;
+        cost: number;
         shopperId: string | null;
         shopperName: string | null;
-        createdAt: Date;
-        monthId: string;
     }>;
     getBazaarList(userId: string): Promise<{}>;
     addDeposit(dto: CreateDepositDto, managerId: string): Promise<{
         id: string;
         createdAt: Date;
         monthId: string;
-        amount: number;
         userId: string;
+        amount: number;
     }>;
 }

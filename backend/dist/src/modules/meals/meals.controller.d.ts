@@ -7,11 +7,11 @@ export declare class MealsController {
         id: string;
     }): Promise<{
         id: string;
+        createdAt: Date;
         type: string;
         category: string;
         count: number;
         status: import("@prisma/client").$Enums.RequestStatus;
-        createdAt: Date;
         logId: string;
         userId: string;
     }>;

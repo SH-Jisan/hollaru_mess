@@ -9,11 +9,11 @@ export declare class MealsService {
     constructor(prisma: PrismaService, validator: ContextValidatorService, cacheManager: Cache);
     requestMealUpdate(dto: UpdateMealDto, userId: string): Promise<{
         id: string;
+        createdAt: Date;
         type: string;
         category: string;
         count: number;
         status: import("@prisma/client").$Enums.RequestStatus;
-        createdAt: Date;
         logId: string;
         userId: string;
     }>;

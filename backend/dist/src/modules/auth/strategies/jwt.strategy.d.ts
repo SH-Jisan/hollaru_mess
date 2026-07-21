@@ -18,6 +18,7 @@ export declare class JwtStrategy extends JwtStrategy_base {
         role: import("@prisma/client").$Enums.Role;
         messId: string | null;
         createdAt: Date;
+        fcmToken: string | null;
     }>;
 }
 export {};

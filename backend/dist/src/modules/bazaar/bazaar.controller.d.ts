@@ -9,25 +9,25 @@ export declare class BazaarController {
         id: string;
     }): Promise<{
         id: string;
+        createdAt: Date;
         items: string;
-        cost: number;
+        monthId: string;
         status: string;
+        cost: number;
         shopperId: string | null;
         shopperName: string | null;
-        createdAt: Date;
-        monthId: string;
     }>;
     completePurchase(itemId: string, dto: CompletePurchaseDto, user: {
         id: string;
     }): Promise<{
         id: string;
+        createdAt: Date;
         items: string;
-        cost: number;
+        monthId: string;
         status: string;
+        cost: number;
         shopperId: string | null;
         shopperName: string | null;
-        createdAt: Date;
-        monthId: string;
     }>;
     getBazaarList(user: {
         id: string;
@@ -38,7 +38,7 @@ export declare class BazaarController {
         id: string;
         createdAt: Date;
         monthId: string;
-        amount: number;
         userId: string;
+        amount: number;
     }>;
 }

@@ -30,6 +30,7 @@ export declare class AuthService {
             role: import("@prisma/client").$Enums.Role;
             messId: string | null;
             createdAt: Date;
+            fcmToken: string | null;
         };
     }>;
     refresh(dto: RefreshDto): Promise<{

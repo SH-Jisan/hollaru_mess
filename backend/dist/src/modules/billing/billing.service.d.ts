@@ -9,11 +9,11 @@ export declare class BillingService {
     constructor(prisma: PrismaService, validator: ContextValidatorService, cacheManager: Cache);
     startNewMonth(dto: StartMonthDto, managerId: string): Promise<{
         id: string;
+        messId: string;
+        createdAt: Date;
         monthName: string;
         isClosed: boolean;
         totalBazaarCost: number;
-        createdAt: Date;
-        messId: string;
     }>;
     getMonthSummary(userId: string): Promise<{}>;
     closeMonthSession(managerId: string): Promise<{

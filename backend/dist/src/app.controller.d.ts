@@ -14,6 +14,7 @@ export declare class AppController {
         hashedRefreshToken: string | null;
         messId: string | null;
         createdAt: Date;
+        fcmToken: string | null;
     }, "hashedPassword" | "hashedRefreshToken">;
     getManagerData(): {
         message: string;

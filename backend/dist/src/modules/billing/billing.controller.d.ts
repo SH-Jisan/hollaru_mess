@@ -7,11 +7,11 @@ export declare class BillingController {
         id: string;
     }): Promise<{
         id: string;
+        messId: string;
+        createdAt: Date;
         monthName: string;
         isClosed: boolean;
         totalBazaarCost: number;
-        createdAt: Date;
-        messId: string;
     }>;
     getMonthSummary(user: {
         id: string;

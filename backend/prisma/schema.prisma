@@ -36,7 +36,8 @@ model User {
   deposits  Deposit[]
   requests  MealRequest[]
   createdAt DateTime @default(now())
-  fmcToken  String?
+  fcmToken  String?
+  notifications      Notification[] // 👈 ইন-অ্যাপ নোটিফিকেশনের রিলেশন
 }
 
 model Mess {
@@ -114,4 +115,14 @@ model Deposit {
   user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   amount     Float
   createdAt  DateTime        @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
