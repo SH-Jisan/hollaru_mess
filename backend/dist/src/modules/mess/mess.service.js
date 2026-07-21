@@ -8,21 +8,29 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessService = void 0;
 const common_1 = require("@nestjs/common");
+const cache_manager_1 = require("@nestjs/cache-manager");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
+const context_validator_service_1 = require("../../common/services/context-validator.service");
+const domain_exception_1 = require("../../common/exceptions/domain.exception");
 let MessService = class MessService {
     prisma;
-    constructor(prisma) {
+    validator;
+    cacheManager;
+    constructor(prisma, validator, cacheManager) {
         this.prisma = prisma;
+        this.validator = validator;
+        this.cacheManager = cacheManager;
     }
     async createMess(dto, userId) {
+        await this.validator.validateUserHasNoMess(userId);
         const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (user.messId) {
-            throw new common_1.BadRequestException('You are already a member of a mess');
-        }
         const emailPart = user.email.split('@')[0].substring(0, 2).toUpperCase().padEnd(2, 'X');
         const timePart = Date.now().toString(36).toUpperCase().slice(-4);
         const code = `MESS-${emailPart}${timePart}`;
@@ -45,15 +53,12 @@ let MessService = class MessService {
         });
     }
     async joinMess(dto, userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (user.messId) {
-            throw new common_1.BadRequestException('You are already a member of a mess');
-        }
+        await this.validator.validateUserHasNoMess(userId);
         const mess = await this.prisma.mess.findUnique({
             where: { code: dto.code.toUpperCase() },
         });
         if (!mess) {
-            throw new common_1.NotFoundException('Mess code not found');
+            throw new domain_exception_1.MessCodeNotFoundException();
         }
         await this.prisma.user.update({
             where: { id: userId },
@@ -62,14 +67,18 @@ let MessService = class MessService {
                 role: client_1.Role.MEMBER,
             },
         });
+        const cacheKey = `mess:${mess.id}:members`;
+        await this.cacheManager.del(cacheKey);
         return { message: 'Successfully joined the mess', messName: mess.name };
     }
     async getMembers(userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (!user.messId) {
-            throw new common_1.BadRequestException('You do not belong to any mess');
+        const { user } = await this.validator.validateUserAndMess(userId);
+        const cacheKey = `mess:${user.messId}:members`;
+        const cachedMembers = await this.cacheManager.get(cacheKey);
+        if (cachedMembers) {
+            return cachedMembers;
         }
-        return this.prisma.user.findMany({
+        const members = await this.prisma.user.findMany({
             where: { messId: user.messId },
             select: {
                 id: true,
@@ -80,11 +89,15 @@ let MessService = class MessService {
                 createdAt: true,
             },
         });
+        await this.cacheManager.set(cacheKey, members, 0);
+        return members;
     }
 };
 exports.MessService = MessService;
 exports.MessService = MessService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __param(2, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        context_validator_service_1.ContextValidatorService, Object])
 ], MessService);
 //# sourceMappingURL=mess.service.js.map

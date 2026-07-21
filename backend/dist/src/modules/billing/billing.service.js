@@ -8,27 +8,32 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BillingService = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
+const cache_manager_1 = require("@nestjs/cache-manager");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
+const context_validator_service_1 = require("../../common/services/context-validator.service");
+const domain_exception_1 = require("../../common/exceptions/domain.exception");
 let BillingService = class BillingService {
     prisma;
-    constructor(prisma) {
+    validator;
+    cacheManager;
+    constructor(prisma, validator, cacheManager) {
         this.prisma = prisma;
+        this.validator = validator;
+        this.cacheManager = cacheManager;
     }
     async startNewMonth(dto, managerId) {
-        const manager = await this.prisma.user.findUniqueOrThrow({ where: { id: managerId } });
-        if (manager.role !== client_1.Role.MANAGER || !manager.messId) {
-            throw new common_1.BadRequestException('Only mess managers can start a new month session');
-        }
-        const mess = await this.prisma.mess.findUniqueOrThrow({ where: { id: manager.messId } });
+        const { manager, mess } = await this.validator.validateManager(managerId);
         if (mess.isMonthActive) {
-            throw new common_1.BadRequestException('A month session is already active. Close it first.');
+            throw new domain_exception_1.MonthAlreadyActiveException();
         }
-        return this.prisma.$transaction(async (tx) => {
-            const month = await tx.monthlyData.create({
+        const month = await this.prisma.$transaction(async (tx) => {
+            const createdMonth = await tx.monthlyData.create({
                 data: {
                     monthName: dto.monthName,
                     messId: manager.messId,
@@ -38,20 +43,25 @@ let BillingService = class BillingService {
                 where: { id: manager.messId },
                 data: {
                     isMonthActive: true,
-                    currentMonthId: month.id,
+                    currentMonthId: createdMonth.id,
                 },
             });
-            return month;
+            return createdMonth;
         });
+        const cacheKey = `billing:${mess.id}:${month.id}:summary`;
+        await this.cacheManager.del(cacheKey);
+        return month;
     }
     async getMonthSummary(userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (!user.messId)
-            throw new common_1.BadRequestException('You do not belong to any mess');
-        const mess = await this.prisma.mess.findUniqueOrThrow({ where: { id: user.messId } });
+        const { user, mess } = await this.validator.validateUserAndMess(userId);
         if (!mess.currentMonthId)
             throw new common_1.NotFoundException('No active or previous month record found');
         const monthId = mess.currentMonthId;
+        const cacheKey = `billing:${mess.id}:${monthId}:summary`;
+        const cachedSummary = await this.cacheManager.get(cacheKey);
+        if (cachedSummary) {
+            return cachedSummary;
+        }
         const bazaarAggregate = await this.prisma.bazaarItem.aggregate({
             where: { monthId, status: 'COMPLETED' },
             _sum: { cost: true },
@@ -76,7 +86,6 @@ let BillingService = class BillingService {
         });
         const memberSummaries = members.map((member) => {
             const totalDeposit = depositMap.get(member.id) || 0;
-            const estimatedCost = 0;
             return {
                 memberId: member.id,
                 name: member.name,
@@ -84,26 +93,25 @@ let BillingService = class BillingService {
                 totalDeposit,
             };
         });
-        return {
+        const summaryResult = {
             monthId,
             totalBazaarCost,
             totalMeals,
             mealRate: Number(mealRate.toFixed(2)),
             members: memberSummaries,
         };
+        await this.cacheManager.set(cacheKey, summaryResult, 0);
+        return summaryResult;
     }
     async closeMonthSession(managerId) {
-        const manager = await this.prisma.user.findUniqueOrThrow({ where: { id: managerId } });
-        if (manager.role !== client_1.Role.MANAGER || !manager.messId) {
-            throw new common_1.BadRequestException('Only managers can close a month session');
-        }
-        const mess = await this.prisma.mess.findUniqueOrThrow({ where: { id: manager.messId } });
+        const { mess } = await this.validator.validateManager(managerId);
         if (!mess.isMonthActive || !mess.currentMonthId) {
             throw new common_1.BadRequestException('No active month session to close');
         }
-        return this.prisma.$transaction(async (tx) => {
+        const monthId = mess.currentMonthId;
+        const result = await this.prisma.$transaction(async (tx) => {
             await tx.monthlyData.update({
-                where: { id: mess.currentMonthId },
+                where: { id: monthId },
                 data: { isClosed: true },
             });
             await tx.mess.update({
@@ -115,11 +123,16 @@ let BillingService = class BillingService {
             });
             return { message: 'Month session closed and archived successfully' };
         });
+        const cacheKey = `billing:${mess.id}:${monthId}:summary`;
+        await this.cacheManager.del(cacheKey);
+        return result;
     }
 };
 exports.BillingService = BillingService;
 exports.BillingService = BillingService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __param(2, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        context_validator_service_1.ContextValidatorService, Object])
 ], BillingService);
 //# sourceMappingURL=billing.service.js.map

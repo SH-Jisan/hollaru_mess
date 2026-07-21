@@ -8,40 +8,45 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BazaarService = void 0;
 const common_1 = require("@nestjs/common");
-const client_1 = require("@prisma/client");
+const cache_manager_1 = require("@nestjs/cache-manager");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
+const context_validator_service_1 = require("../../common/services/context-validator.service");
 let BazaarService = class BazaarService {
     prisma;
-    constructor(prisma) {
+    validator;
+    cacheManager;
+    constructor(prisma, validator, cacheManager) {
         this.prisma = prisma;
+        this.validator = validator;
+        this.cacheManager = cacheManager;
     }
     async createBazaarItem(dto, userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (!user.messId)
-            throw new common_1.BadRequestException('You do not belong to any mess');
-        const mess = await this.prisma.mess.findUniqueOrThrow({ where: { id: user.messId } });
-        if (!mess.isMonthActive || !mess.currentMonthId) {
-            throw new common_1.BadRequestException('Active month summary session is not started');
-        }
-        return this.prisma.bazaarItem.create({
+        const { mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
+        const item = await this.prisma.bazaarItem.create({
             data: {
-                monthId: mess.currentMonthId,
+                monthId: activeMonthId,
                 items: dto.items,
                 status: 'PENDING',
             },
         });
+        const cacheKey = `bazaar:${mess.id}:${activeMonthId}:list`;
+        await this.cacheManager.del(cacheKey);
+        return item;
     }
     async completePurchase(itemId, dto, userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
+        const { user, mess } = await this.validator.validateUserAndMess(userId);
         const item = await this.prisma.bazaarItem.findUnique({ where: { id: itemId } });
         if (!item)
             throw new common_1.NotFoundException('Bazaar item not found');
         if (item.status === 'COMPLETED')
             throw new common_1.BadRequestException('Purchase already completed');
-        return this.prisma.bazaarItem.update({
+        const updatedItem = await this.prisma.bazaarItem.update({
             where: { id: itemId },
             data: {
                 cost: dto.cost,
@@ -50,47 +55,56 @@ let BazaarService = class BazaarService {
                 shopperName: user.name,
             },
         });
+        if (mess.currentMonthId) {
+            const cacheKey = `bazaar:${mess.id}:${mess.currentMonthId}:list`;
+            await this.cacheManager.del(cacheKey);
+            const billingCacheKey = `billing:${mess.id}:${mess.currentMonthId}:summary`;
+            await this.cacheManager.del(billingCacheKey);
+        }
+        return updatedItem;
     }
     async getBazaarList(userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (!user.messId)
-            throw new common_1.BadRequestException('You do not belong to any mess');
-        const mess = await this.prisma.mess.findUniqueOrThrow({ where: { id: user.messId } });
+        const { mess } = await this.validator.validateUserAndMess(userId);
         if (!mess.currentMonthId)
             return [];
-        return this.prisma.bazaarItem.findMany({
+        const cacheKey = `bazaar:${mess.id}:${mess.currentMonthId}:list`;
+        const cachedList = await this.cacheManager.get(cacheKey);
+        if (cachedList) {
+            return cachedList;
+        }
+        const bazaarList = await this.prisma.bazaarItem.findMany({
             where: { monthId: mess.currentMonthId },
             orderBy: { createdAt: 'desc' },
         });
+        await this.cacheManager.set(cacheKey, bazaarList, 0);
+        return bazaarList;
     }
     async addDeposit(dto, managerId) {
-        const manager = await this.prisma.user.findUniqueOrThrow({ where: { id: managerId } });
-        if (manager.role !== client_1.Role.MANAGER) {
-            throw new common_1.BadRequestException('Only managers can log member deposits');
-        }
-        if (!manager.messId) {
-            throw new common_1.BadRequestException('You do not belong to any mess');
+        const { manager, mess } = await this.validator.validateManager(managerId);
+        if (!mess.isMonthActive || !mess.currentMonthId) {
+            throw new common_1.BadRequestException('Active month summary session is not started');
         }
         const targetUser = await this.prisma.user.findUnique({ where: { id: dto.userId } });
         if (!targetUser || targetUser.messId !== manager.messId) {
             throw new common_1.BadRequestException('User not found in your mess');
         }
-        const mess = await this.prisma.mess.findUniqueOrThrow({ where: { id: manager.messId } });
-        if (!mess.isMonthActive || !mess.currentMonthId) {
-            throw new common_1.BadRequestException('Active month summary session is not started');
-        }
-        return this.prisma.deposit.create({
+        const deposit = await this.prisma.deposit.create({
             data: {
                 monthId: mess.currentMonthId,
                 userId: dto.userId,
                 amount: dto.amount,
             },
         });
+        const billingCacheKey = `billing:${mess.id}:${mess.currentMonthId}:summary`;
+        await this.cacheManager.del(billingCacheKey);
+        return deposit;
     }
 };
 exports.BazaarService = BazaarService;
 exports.BazaarService = BazaarService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __param(2, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        context_validator_service_1.ContextValidatorService, Object])
 ], BazaarService);
 //# sourceMappingURL=bazaar.service.js.map

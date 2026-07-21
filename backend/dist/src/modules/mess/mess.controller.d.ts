@@ -7,9 +7,8 @@ export declare class MessController {
     createMess(createMessDto: CreateMessDto, user: {
         id: string;
     }): Promise<{
-        name: string;
         id: string;
-        createdAt: Date;
+        name: string;
         code: string;
         managerId: string;
         isMonthActive: boolean;
@@ -17,6 +16,7 @@ export declare class MessController {
         requestStartTime: string;
         lunchEndTime: string;
         dinnerEndTime: string;
+        createdAt: Date;
     }>;
     joinMess(joinMessDto: JoinMessDto, user: {
         id: string;
@@ -26,12 +26,5 @@ export declare class MessController {
     }>;
     getMembers(user: {
         id: string;
-    }): Promise<{
-        name: string;
-        id: string;
-        email: string;
-        phone: string | null;
-        role: import("@prisma/client").$Enums.Role;
-        createdAt: Date;
-    }[]>;
+    }): Promise<{}>;
 }

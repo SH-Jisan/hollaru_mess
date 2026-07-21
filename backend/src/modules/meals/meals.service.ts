@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { RequestStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
@@ -9,20 +11,15 @@ export class MealsService {
   constructor(
     private prisma: PrismaService,
     private validator: ContextValidatorService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   // ১. মিল বন্ধ (OFF) বা গেস্ট যোগ করার রিকোয়েস্ট তৈরি করা
   async requestMealUpdate(dto: UpdateMealDto, userId: string) {
-    // ইউজার, মেস এবং একটিভ মান্থ ভ্যালিডেট করা (১ লাইনে!)
     const { mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
-
-    // বর্তমান তারিখ YYYY-MM-DD ফরম্যাটে তৈরি করা
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // চেক করা আজকের জন্য DailyLog তৈরি করা আছে কিনা, না থাকলে তৈরি করা
     const log = await this.getOrCreateDailyLog(activeMonthId, todayStr, mess.id);
-
-    // ডেডলাইন/টাইমিং উইন্ডো চেক করা
     this.checkDeadline(mess, dto.type);
 
     return this.prisma.mealRequest.create({
@@ -37,11 +34,11 @@ export class MealsService {
     });
   }
 
-  // ২. ম্যানেজার কর্তৃক মেম্বারের রিকোয়েস্ট অ্যাপ্রুভ করা (Transaction-safe)
+  // ২. ম্যানেজার রিকোয়েস্ট অ্যাপ্রুভ করলে ক্যাশ ইনভ্যালিডেট/ডিলিট করা
   async approveRequest(requestId: string, managerId: string) {
     const { manager } = await this.validator.validateManager(managerId);
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const request = await tx.mealRequest.findUniqueOrThrow({
         where: { id: requestId },
         include: { log: true, user: true },
@@ -74,13 +71,28 @@ export class MealsService {
 
       return { message: 'Request approved successfully' };
     });
+
+    // 🔴 EVENT-DRIVEN INVALIDATION: ম্যানেজার অ্যাপ্রুভ করায় আজকের লাইভ মিলের ক্যাশ মুছে দেওয়া
+    const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `meals:${manager.messId!}:${todayStr}:live`;
+    await this.cacheManager.del(cacheKey);
+
+    return result;
   }
 
-  // ৩. রেন্ডার করার জন্য আজকের মিলের লাইভ কাউন্ট দেখা
+  // ৩. রিয়েল-টাইম মিলের লাইভ কাউন্ট দেখা (Cache-Aside Pattern)
   async getDailyLiveCount(userId: string) {
     const { user } = await this.validator.validateUserAndMess(userId);
-
     const todayStr = new Date().toISOString().split('T')[0];
+    const cacheKey = `meals:${user.messId!}:${todayStr}:live`;
+
+    // ⚡ ১. প্রথমে মেমোরি ক্যাশে চেক করা (Cache Lookup)
+    const cachedData = await this.cacheManager.get(cacheKey);
+    if (cachedData) {
+      return cachedData; // ক্যাশ থেকে সরাসরি রেসপন্স (0ms latency!)
+    }
+
+    // 🗄️ ২. ক্যাশে না থাকলে ডাটাবেজ থেকে নিয়ে আসা
     const log = await this.prisma.dailyLog.findFirst({
       where: {
         id: todayStr,
@@ -95,18 +107,19 @@ export class MealsService {
       },
     });
 
-    if (!log) return { message: 'No meal records initialized for today yet.' };
-    return log;
-  }
+    const responseData = log || { message: 'No meal records initialized for today yet.' };
 
-  // --- প্রাইভেট হেল্পার মেথডসমূহ ---
+    // 💾 ৩. ডাটাবেজ থেকে আনা ডাটা ১২ ঘন্টার জন্য মেমোরি ক্যাশে সেভ করে রাখা
+    await this.cacheManager.set(cacheKey, responseData, 43200000);
+
+    return responseData;
+  }
 
   private async getOrCreateDailyLog(monthId: string, dateStr: string, messId: string) {
     let log = await this.prisma.dailyLog.findUnique({ where: { id: dateStr } });
     
     if (!log) {
       const memberCount = await this.prisma.user.count({ where: { messId } });
-
       log = await this.prisma.dailyLog.create({
         data: {
           id: dateStr,

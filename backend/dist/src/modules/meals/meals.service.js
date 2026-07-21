@@ -8,26 +8,29 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MealsService = void 0;
 const common_1 = require("@nestjs/common");
+const cache_manager_1 = require("@nestjs/cache-manager");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
+const context_validator_service_1 = require("../../common/services/context-validator.service");
 let MealsService = class MealsService {
     prisma;
-    constructor(prisma) {
+    validator;
+    cacheManager;
+    constructor(prisma, validator, cacheManager) {
         this.prisma = prisma;
+        this.validator = validator;
+        this.cacheManager = cacheManager;
     }
     async requestMealUpdate(dto, userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (!user.messId)
-            throw new common_1.BadRequestException('You do not belong to any mess');
-        const mess = await this.prisma.mess.findUniqueOrThrow({ where: { id: user.messId } });
-        if (!mess.isMonthActive || !mess.currentMonthId) {
-            throw new common_1.BadRequestException('Active month summary session is not started by manager');
-        }
+        const { mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
         const todayStr = new Date().toISOString().split('T')[0];
-        const log = await this.getOrCreateDailyLog(mess.currentMonthId, todayStr, user.messId);
+        const log = await this.getOrCreateDailyLog(activeMonthId, todayStr, mess.id);
         this.checkDeadline(mess, dto.type);
         return this.prisma.mealRequest.create({
             data: {
@@ -41,10 +44,8 @@ let MealsService = class MealsService {
         });
     }
     async approveRequest(requestId, managerId) {
-        const manager = await this.prisma.user.findUniqueOrThrow({ where: { id: managerId } });
-        if (manager.role !== client_1.Role.MANAGER)
-            throw new common_1.BadRequestException('Only managers can approve requests');
-        return this.prisma.$transaction(async (tx) => {
+        const { manager } = await this.validator.validateManager(managerId);
+        const result = await this.prisma.$transaction(async (tx) => {
             const request = await tx.mealRequest.findUniqueOrThrow({
                 where: { id: requestId },
                 include: { log: true, user: true },
@@ -71,12 +72,19 @@ let MealsService = class MealsService {
             });
             return { message: 'Request approved successfully' };
         });
+        const todayStr = new Date().toISOString().split('T')[0];
+        const cacheKey = `meals:${manager.messId}:${todayStr}:live`;
+        await this.cacheManager.del(cacheKey);
+        return result;
     }
     async getDailyLiveCount(userId) {
-        const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        if (!user.messId)
-            throw new common_1.BadRequestException('You do not belong to any mess');
+        const { user } = await this.validator.validateUserAndMess(userId);
         const todayStr = new Date().toISOString().split('T')[0];
+        const cacheKey = `meals:${user.messId}:${todayStr}:live`;
+        const cachedData = await this.cacheManager.get(cacheKey);
+        if (cachedData) {
+            return cachedData;
+        }
         const log = await this.prisma.dailyLog.findFirst({
             where: {
                 id: todayStr,
@@ -90,9 +98,9 @@ let MealsService = class MealsService {
                 },
             },
         });
-        if (!log)
-            return { message: 'No meal records initialized for today yet.' };
-        return log;
+        const responseData = log || { message: 'No meal records initialized for today yet.' };
+        await this.cacheManager.set(cacheKey, responseData, 43200000);
+        return responseData;
     }
     async getOrCreateDailyLog(monthId, dateStr, messId) {
         let log = await this.prisma.dailyLog.findUnique({ where: { id: dateStr } });
@@ -123,6 +131,8 @@ let MealsService = class MealsService {
 exports.MealsService = MealsService;
 exports.MealsService = MealsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __param(2, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        context_validator_service_1.ContextValidatorService, Object])
 ], MealsService);
 //# sourceMappingURL=meals.service.js.map

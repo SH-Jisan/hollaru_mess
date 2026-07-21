@@ -1,4 +1,6 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
@@ -11,20 +13,18 @@ export class MessService {
   constructor(
     private prisma: PrismaService,
     private validator: ContextValidatorService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   // ১. নতুন মেস তৈরি করা
   async createMess(dto: CreateMessDto, userId: string) {
-    // সেন্ট্রাল ভ্যালিডেটর দিয়ে চেক করা ইউজার অলরেডি কোনো মেসে যুক্ত আছে কিনা
     await this.validator.validateUserHasNoMess(userId);
 
-    // ইমেইলের প্রথম ২ অক্ষর এবং বর্তমান টাইমের বেস-৩৬ কাস্টম কম্প্রেশন দিয়ে ৬ ডিজিটের ইউনিক কোড তৈরি করা
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     const emailPart = user.email.split('@')[0].substring(0, 2).toUpperCase().padEnd(2, 'X');
     const timePart = Date.now().toString(36).toUpperCase().slice(-4);
     const code = `MESS-${emailPart}${timePart}`;
 
-    // প্রিজমা ট্রানজেকশন ব্যবহার করে মেস তৈরি এবং মেম্বারের রোল ও মেস আইডি আপডেট করা
     return this.prisma.$transaction(async (tx) => {
       const mess = await tx.mess.create({
         data: {
@@ -66,14 +66,26 @@ export class MessService {
       },
     });
 
+    // 🔴 Invalidation: নতুন সদস্য জয়েন করায় মেসের মেম্বার লিস্টের ক্যাশ মুছে দেওয়া
+    const cacheKey = `mess:${mess.id}:members`;
+    await this.cacheManager.del(cacheKey);
+
     return { message: 'Successfully joined the mess', messName: mess.name };
   }
 
-  // ৩. মেসের সব মেম্বারদের তালিকা দেখা
+  // ৩. মেসের সব মেম্বারদের তালিকা দেখা (Cache-Aside Pattern)
   async getMembers(userId: string) {
     const { user } = await this.validator.validateUserAndMess(userId);
+    const cacheKey = `mess:${user.messId!}:members`;
 
-    return this.prisma.user.findMany({
+    // ⚡ ১. ক্যাশে চেক করা
+    const cachedMembers = await this.cacheManager.get(cacheKey);
+    if (cachedMembers) {
+      return cachedMembers; // 0ms রেসপন্স!
+    }
+
+    // 🗄️ ২. ক্যাশে না থাকলে ডাটাবেজ থেকে রিড করা
+    const members = await this.prisma.user.findMany({
       where: { messId: user.messId! },
       select: {
         id: true,
@@ -84,5 +96,10 @@ export class MessService {
         createdAt: true,
       },
     });
+
+    // 💾 ৩. কেও জয়েন/রিমুভ না হওয়ার পর্জন্ত মেম্বার ডাটা সেইভ থাকবে।
+    await this.cacheManager.set(cacheKey, members, 0);
+
+    return members;
   }
 }

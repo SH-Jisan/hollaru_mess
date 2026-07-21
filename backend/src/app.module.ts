@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CacheModule } from '@nestjs/cache-manager';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -15,6 +16,11 @@ import { BillingModule } from './modules/billing/billing.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate,
+    }),
+    CacheModule.register({
+      isGlobal: true,
+      ttl: 300000,
+      max: 500,
     }),
     PrismaModule,
     AuthModule,

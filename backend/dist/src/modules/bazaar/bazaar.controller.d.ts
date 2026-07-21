@@ -31,16 +31,7 @@ export declare class BazaarController {
     }>;
     getBazaarList(user: {
         id: string;
-    }): Promise<{
-        id: string;
-        items: string;
-        cost: number;
-        status: string;
-        shopperId: string | null;
-        shopperName: string | null;
-        createdAt: Date;
-        monthId: string;
-    }[]>;
+    }): Promise<{}>;
     addDeposit(dto: CreateDepositDto, user: {
         id: string;
     }): Promise<{

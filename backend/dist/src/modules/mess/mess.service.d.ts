@@ -1,13 +1,16 @@
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { CreateMessDto } from './dto/create-mess.dto';
 import { JoinMessDto } from './dto/join-mess.dto';
 export declare class MessService {
     private prisma;
-    constructor(prisma: PrismaService);
+    private validator;
+    private cacheManager;
+    constructor(prisma: PrismaService, validator: ContextValidatorService, cacheManager: Cache);
     createMess(dto: CreateMessDto, userId: string): Promise<{
-        name: string;
         id: string;
-        createdAt: Date;
+        name: string;
         code: string;
         managerId: string;
         isMonthActive: boolean;
@@ -15,17 +18,11 @@ export declare class MessService {
         requestStartTime: string;
         lunchEndTime: string;
         dinnerEndTime: string;
+        createdAt: Date;
     }>;
     joinMess(dto: JoinMessDto, userId: string): Promise<{
         message: string;
         messName: string;
     }>;
-    getMembers(userId: string): Promise<{
-        name: string;
-        id: string;
-        email: string;
-        phone: string | null;
-        role: import("@prisma/client").$Enums.Role;
-        createdAt: Date;
-    }[]>;
+    getMembers(userId: string): Promise<{}>;
 }
