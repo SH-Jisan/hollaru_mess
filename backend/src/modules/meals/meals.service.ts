@@ -1,7 +1,9 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
-import { RequestStatus, Role } from '@prisma/client';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Cache } from 'cache-manager';
+import { Queue } from 'bullmq';
+import { RequestStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { UpdateMealDto } from './dto/update-meal.dto';
@@ -12,9 +14,9 @@ export class MealsService {
     private prisma: PrismaService,
     private validator: ContextValidatorService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @InjectQueue('notification-queue') private notificationQueue: Queue, // 👈 BullMQ Queue ইনজেক্ট করা
   ) {}
 
-  // ১. মিল বন্ধ (OFF) বা গেস্ট যোগ করার রিকোয়েস্ট তৈরি করা
   async requestMealUpdate(dto: UpdateMealDto, userId: string) {
     const { mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
     const todayStr = new Date().toISOString().split('T')[0];
@@ -34,11 +36,10 @@ export class MealsService {
     });
   }
 
-  // ২. ম্যানেজার রিকোয়েস্ট অ্যাপ্রুভ করলে ক্যাশ ইনভ্যালিডেট/ডিলিট করা
   async approveRequest(requestId: string, managerId: string) {
     const { manager } = await this.validator.validateManager(managerId);
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const { result, targetUserId, mealType, mealCategory } = await this.prisma.$transaction(async (tx) => {
       const request = await tx.mealRequest.findUniqueOrThrow({
         where: { id: requestId },
         include: { log: true, user: true },
@@ -69,30 +70,39 @@ export class MealsService {
         },
       });
 
-      return { message: 'Request approved successfully' };
+      return {
+        result: { message: 'Request approved successfully' },
+        targetUserId: request.userId,
+        mealType: request.type,
+        mealCategory: request.category,
+      };
     });
 
-    // 🔴 EVENT-DRIVEN INVALIDATION: ম্যানেজার অ্যাপ্রুভ করায় আজকের লাইভ মিলের ক্যাশ মুছে দেওয়া
+    // 🔴 Invalidation: আজকের লাইভ মিলের ক্যাশ মুছে দেওয়া
     const todayStr = new Date().toISOString().split('T')[0];
     const cacheKey = `meals:${manager.messId!}:${todayStr}:live`;
     await this.cacheManager.del(cacheKey);
 
+    // ⚡ BACKGROUND QUEUE: মেম্বারের ফোনে ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন জব পুশ করা
+    await this.notificationQueue.add('send-user-notification', {
+      userId: targetUserId,
+      title: '🍲 Meal Request Approved!',
+      body: `Manager approved your ${mealCategory} request for ${mealType}.`,
+    });
+
     return result;
   }
 
-  // ৩. রিয়েল-টাইম মিলের লাইভ কাউন্ট দেখা (Cache-Aside Pattern)
   async getDailyLiveCount(userId: string) {
     const { user } = await this.validator.validateUserAndMess(userId);
     const todayStr = new Date().toISOString().split('T')[0];
     const cacheKey = `meals:${user.messId!}:${todayStr}:live`;
 
-    // ⚡ ১. প্রথমে মেমোরি ক্যাশে চেক করা (Cache Lookup)
     const cachedData = await this.cacheManager.get(cacheKey);
     if (cachedData) {
-      return cachedData; // ক্যাশ থেকে সরাসরি রেসপন্স (0ms latency!)
+      return cachedData;
     }
 
-    // 🗄️ ২. ক্যাশে না থাকলে ডাটাবেজ থেকে নিয়ে আসা
     const log = await this.prisma.dailyLog.findFirst({
       where: {
         id: todayStr,
@@ -108,8 +118,6 @@ export class MealsService {
     });
 
     const responseData = log || { message: 'No meal records initialized for today yet.' };
-
-    // 💾 ৩. ডাটাবেজ থেকে আনা ডাটা ১২ ঘন্টার জন্য মেমোরি ক্যাশে সেভ করে রাখা
     await this.cacheManager.set(cacheKey, responseData, 43200000);
 
     return responseData;
@@ -117,7 +125,6 @@ export class MealsService {
 
   private async getOrCreateDailyLog(monthId: string, dateStr: string, messId: string) {
     let log = await this.prisma.dailyLog.findUnique({ where: { id: dateStr } });
-    
     if (!log) {
       const memberCount = await this.prisma.user.count({ where: { messId } });
       log = await this.prisma.dailyLog.create({

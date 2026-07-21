@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
+import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './common/prisma/prisma.module';
@@ -22,6 +23,16 @@ import { NotificationModule } from './modules/notification/notification.module';
       isGlobal: true,
       ttl: 300000,
       max: 500,
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: async(configService: ConfigService) =>({
+        connection: {
+          host: configService.get<string>('REDIS_HOST', 'localhost'),
+          port: configService.get<number>('REDIS_PORT', 6379),
+        },
+      }),
+      inject: [ConfigService],
     }),
     PrismaModule,
     AuthModule,

@@ -1,6 +1,8 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Cache } from 'cache-manager';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { CompletePurchaseDto } from './dto/complete-purchase.dto';
@@ -13,11 +15,11 @@ export class BazaarService {
     private prisma: PrismaService,
     private validator: ContextValidatorService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @InjectQueue('notification-queue') private notificationQueue: Queue, // 👈 BullMQ Queue ইনজেক্ট করা
   ) {}
 
-  // ১. মেম্বারদের জন্য বাজার লিস্টে আইটেম এড করা
   async createBazaarItem(dto: CreateBazaarItemDto, userId: string) {
-    const { mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
+    const { user, mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
 
     const item = await this.prisma.bazaarItem.create({
       data: {
@@ -27,14 +29,20 @@ export class BazaarService {
       },
     });
 
-    // 🔴 Invalidation: নতুন বাজার আইটেম এড হওয়ায় ক্যাশ মুছে দেওয়া
+    // 🔴 Invalidation: বাজার ক্যাশ ক্লিয়ার করা
     const cacheKey = `bazaar:${mess.id}:${activeMonthId}:list`;
     await this.cacheManager.del(cacheKey);
+
+    // ⚡ BACKGROUND QUEUE: মেসের সব মেম্বারদের ফোনে ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন জব পুশ করা
+    await this.notificationQueue.add('send-mess-notification', {
+      messId: mess.id,
+      title: '🛒 New Bazaar Item Added!',
+      body: `${user.name} added new items: "${dto.items}"`,
+    });
 
     return item;
   }
 
-  // ২. বাজার করার পর খরচ সাবমিট ও কমপ্লিট করা
   async completePurchase(itemId: string, dto: CompletePurchaseDto, userId: string) {
     const { user, mess } = await this.validator.validateUserAndMess(userId);
     const item = await this.prisma.bazaarItem.findUnique({ where: { id: itemId } });
@@ -52,12 +60,10 @@ export class BazaarService {
       },
     });
 
-    // 🔴 Invalidation: খরচ সাবমিট করায় বাজার খরচের ক্যাশ মুছে দেওয়া
     if (mess.currentMonthId) {
       const cacheKey = `bazaar:${mess.id}:${mess.currentMonthId}:list`;
       await this.cacheManager.del(cacheKey);
 
-      // বাজার খরচ যুক্ত হওয়ায় রানিং মাসের বিলিং সামারির ক্যাশও ক্লিয়ার করে দেওয়া
       const billingCacheKey = `billing:${mess.id}:${mess.currentMonthId}:summary`;
       await this.cacheManager.del(billingCacheKey);
     }
@@ -65,32 +71,26 @@ export class BazaarService {
     return updatedItem;
   }
 
-  // ৩. মেসের রানিং মাসের বাজার খরচের তালিকা দেখা (Cache-Aside Pattern)
   async getBazaarList(userId: string) {
     const { mess } = await this.validator.validateUserAndMess(userId);
     if (!mess.currentMonthId) return [];
 
     const cacheKey = `bazaar:${mess.id}:${mess.currentMonthId}:list`;
 
-    // ⚡ ১. ক্যাশে খুঁজবে
     const cachedList = await this.cacheManager.get(cacheKey);
     if (cachedList) {
       return cachedList;
     }
 
-    // 🗄️ ২. ডাটাবেজ থেকে রিড করবে
     const bazaarList = await this.prisma.bazaarItem.findMany({
       where: { monthId: mess.currentMonthId },
       orderBy: { createdAt: 'desc' },
     });
 
-// 💾 পরবর্তী কোনো আপডেট (Create/Complete) না করা পর্যন্ত ক্যাশে থাকবে (TTL = 0)
     await this.cacheManager.set(cacheKey, bazaarList, 0);
-
     return bazaarList;
   }
 
-  // ৪. মেম্বারদের ডিপোজিট/জমা টাকা লগ করা (Only Manager)
   async addDeposit(dto: CreateDepositDto, managerId: string) {
     const { manager, mess } = await this.validator.validateManager(managerId);
 
@@ -111,9 +111,15 @@ export class BazaarService {
       },
     });
 
-    // 🔴 Invalidation: মেম্বারের ডিপোজিট জমা হওয়ায় বিলিং সামারির ক্যাশ মুছে দেওয়া
     const billingCacheKey = `billing:${mess.id}:${mess.currentMonthId}:summary`;
     await this.cacheManager.del(billingCacheKey);
+
+    // ⚡ BACKGROUND QUEUE: যে মেম্বারের ডিপোজিট জমা হলো তার ফোনে নোটিফিকেশন জব পুশ করা
+    await this.notificationQueue.add('send-user-notification', {
+      userId: dto.userId,
+      title: '💰 Deposit Logged!',
+      body: `Manager logged a deposit of BDT ${dto.amount} for you.`,
+    });
 
     return deposit;
   }
