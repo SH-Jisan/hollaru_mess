@@ -13,6 +13,9 @@ import { MealsModule } from './modules/meals/meals.module';
 import { BazaarModule } from './modules/bazaar/bazaar.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { SystemModule } from './modules/system/system.module';
+import { APP_INTERCEPTOR } from '@nestjs/core';
+import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
 
 @Module({
   imports: [
@@ -25,10 +28,9 @@ import { NotificationModule } from './modules/notification/notification.module';
       ttl: 300000,
       max: 500,
     }),
-    // 📊 Prometheus Metrics Endpoint (/metrics)
     PrometheusModule.register({
       defaultMetrics: {
-        enabled: true, // CPU, RAM, Memory Leak, Event loop metrics
+        enabled: true,
       },
       path: '/metrics',
     }),
@@ -52,8 +54,15 @@ import { NotificationModule } from './modules/notification/notification.module';
     BazaarModule,
     BillingModule,
     NotificationModule,
+    SystemModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: MetricsInterceptor,
+    },
+  ],
 })
 export class AppModule {}

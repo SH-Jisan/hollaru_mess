@@ -22,6 +22,9 @@ const meals_module_1 = require("./modules/meals/meals.module");
 const bazaar_module_1 = require("./modules/bazaar/bazaar.module");
 const billing_module_1 = require("./modules/billing/billing.module");
 const notification_module_1 = require("./modules/notification/notification.module");
+const system_module_1 = require("./modules/system/system.module");
+const core_1 = require("@nestjs/core");
+const metrics_interceptors_1 = require("./common/interceptors/metrics.interceptors");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -63,9 +66,16 @@ exports.AppModule = AppModule = __decorate([
             bazaar_module_1.BazaarModule,
             billing_module_1.BillingModule,
             notification_module_1.NotificationModule,
+            system_module_1.SystemModule,
         ],
         controllers: [app_controller_1.AppController],
-        providers: [app_service_1.AppService],
+        providers: [
+            app_service_1.AppService,
+            {
+                provide: core_1.APP_INTERCEPTOR,
+                useClass: metrics_interceptors_1.MetricsInterceptor,
+            },
+        ],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map
