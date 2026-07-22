@@ -1,6 +1,7 @@
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -33,6 +34,12 @@ describe('AuthService (Unit Tests)', () => {
     }),
   };
 
+  const mockCacheManager = {
+    get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
+    del: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -40,6 +47,7 @@ describe('AuthService (Unit Tests)', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
       ],
     }).compile();
 
@@ -47,6 +55,7 @@ describe('AuthService (Unit Tests)', () => {
     prisma = module.get<PrismaService>(PrismaService);
     jest.clearAllMocks();
   });
+
 
   describe('register', () => {
     it('should throw ConflictException if email is already registered', async () => {

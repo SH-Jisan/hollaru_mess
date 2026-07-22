@@ -41,11 +41,15 @@ var __importStar = (this && this.__importStar) || (function () {
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const jwt_1 = require("@nestjs/jwt");
+const cache_manager_1 = require("@nestjs/cache-manager");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto = __importStar(require("crypto"));
 const prisma_service_1 = require("../../common/prisma/prisma.service");
@@ -53,10 +57,12 @@ let AuthService = class AuthService {
     prisma;
     jwtService;
     configService;
-    constructor(prisma, jwtService, configService) {
+    cacheManager;
+    constructor(prisma, jwtService, configService, cacheManager) {
         this.prisma = prisma;
         this.jwtService = jwtService;
         this.configService = configService;
+        this.cacheManager = cacheManager;
     }
     async register(dto) {
         const existingUser = await this.prisma.user.findUnique({
@@ -88,9 +94,17 @@ let AuthService = class AuthService {
         return { user, ...tokens };
     }
     async login(dto) {
-        const user = await this.prisma.user.findUnique({
-            where: { email: dto.email },
-        });
+        const cacheKey = `auth:user:${dto.email}`;
+        let user = await this.cacheManager.get(cacheKey);
+        if (!user) {
+            user = await this.prisma.user.findUnique({
+                where: { email: dto.email },
+            });
+            if (user) {
+                const { hashedRefreshToken, ...safeCachePayload } = user;
+                await this.cacheManager.set(cacheKey, safeCachePayload, 900000);
+            }
+        }
         if (!user) {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
@@ -102,6 +116,9 @@ let AuthService = class AuthService {
         this.updateRefreshToken(user.id, tokens.refreshToken).catch(() => { });
         const { hashedPassword, hashedRefreshToken, ...userWithoutSecrets } = user;
         return { user: userWithoutSecrets, ...tokens };
+    }
+    async clearUserAuthCache(email) {
+        await this.cacheManager.del(`auth:user:${email}`);
     }
     async refresh(dto) {
         try {
@@ -154,8 +171,9 @@ let AuthService = class AuthService {
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
+    __param(3, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         jwt_1.JwtService,
-        config_1.ConfigService])
+        config_1.ConfigService, Object])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

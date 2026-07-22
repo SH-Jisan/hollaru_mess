@@ -18,16 +18,7 @@ export declare class AuthController {
     login(loginDto: LoginDto): Promise<{
         accessToken: string;
         refreshToken: string;
-        user: {
-            id: string;
-            name: string;
-            email: string;
-            phone: string | null;
-            role: import("@prisma/client").$Enums.Role;
-            createdAt: Date;
-            fcmToken: string | null;
-            messId: string | null;
-        };
+        user: any;
     }>;
     refresh(refreshDto: RefreshDto): Promise<{
         accessToken: string;
