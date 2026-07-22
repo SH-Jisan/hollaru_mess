@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meal Book - Live System & API Metrics Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(23, 32, 54, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --accent: #6366f1;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; }
+
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+    }
+    .title-area { display: flex; align-items: center; gap: 12px; }
+    .pulse-dot { width: 12px; height: 12px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } 100% { opacity: 1; transform: scale(1); } }
+    
+    h1 { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, #a5b4fc, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .badge { background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: #a5b4fc; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+
+    .grid-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
+    .card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border); padding: 18px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .card-title { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-value { font-size: 24px; font-weight: 700; color: #fff; }
+    .card-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .section-title { font-size: 16px; font-weight: 600; }
+    .search-box { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; color: #fff; outline: none; font-size: 13px; width: 250px; }
+
+    .table-container { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { background: rgba(255,255,255,0.03); color: var(--text-muted); padding: 14px 18px; font-size: 12px; font-weight: 600; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+    td { padding: 14px 18px; font-size: 13px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .method { font-weight: 700; font-size: 11px; padding: 3px 8px; border-radius: 6px; display: inline-block; min-width: 55px; text-align: center; }
+    .method-GET { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .method-POST { background: rgba(99, 102, 241, 0.2); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); }
+    .method-PATCH { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .method-DELETE { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    .latency-tag { padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; }
+    .lat-fast { color: #34d399; background: rgba(16, 185, 129, 0.1); }
+    .lat-med { color: #fbbf24; background: rgba(245, 158, 11, 0.1); }
+    .lat-slow { color: #f87171; background: rgba(239, 68, 68, 0.1); }
+
+    .empty-state { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title-area">
+      <div class="pulse-dot"></div>
+      <h1>Meal Book - System Observability Dashboard</h1>
+      <span class="badge" id="lastUpdated">Updating...</span>
+    </div>
+    <div style="font-size: 12px; color: var(--text-muted);">Auto-Refresh: <strong style="color:var(--success);">3s</strong></div>
+  </div>
+
+  <div class="grid-cards">
+    <div class="card">
+      <div class="card-title">Server Uptime</div>
+      <div class="card-value" id="uptimeVal">--</div>
+      <div class="card-sub" id="uptimeSec">0 seconds</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Process Memory (Heap)</div>
+      <div class="card-value" id="heapVal">--</div>
+      <div class="card-sub" id="rssVal">RSS: --</div>
+    </div>
+    <div class="card">
+      <div class="card-title">System RAM (Free / Total)</div>
+      <div class="card-value" id="ramFreeVal">--</div>
+      <div class="card-sub" id="ramTotalVal">Total: --</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Database Latency (Ping)</div>
+      <div class="card-value" id="dbLatencyVal">--</div>
+      <div class="card-sub" id="dbStatusVal">Status: --</div>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">📊 Per-Route API Metrics Engine</div>
+    <input type="text" id="searchInput" class="search-box" placeholder="Filter API Route..." onkeyup="filterRoutes()">
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>API Route Path</th>
+          <th>Total Requests</th>
+          <th>Success / Errors</th>
+          <th>Average Latency</th>
+          <th>Last Hit Time</th>
+        </tr>
+      </thead>
+      <tbody id="metricsTable">
+        <tr>
+          <td colspan="6" class="empty-state">Loading metrics data...</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+    <script>
+    let rawMetrics = [];
+
+    async function fetchMetrics() {
+      try {
+        const res = await fetch('/system/status');
+        const json = await res.json();
+        
+        // 🟢 JSON আনপ্যাকিং লজিক (আসল মেট্রিক্স ডাটা রিড করা)
+        const data = json.data || json;
+
+        if (!data || !data.uptime) return;
+
+        // Update Cards
+        document.getElementById('uptimeVal').innerText = data.uptime.formatted;
+        document.getElementById('uptimeSec').innerText = data.uptime.seconds + ' seconds running';
+        document.getElementById('heapVal').innerText = data.memory.heapUsedMb;
+        document.getElementById('rssVal').innerText = 'RSS: ' + data.memory.processRssMb;
+        document.getElementById('ramFreeVal').innerText = data.memory.systemFreeRamGb + ' Free';
+        document.getElementById('ramTotalVal').innerText = 'Total RAM: ' + data.memory.systemTotalRamGb;
+        
+        document.getElementById('dbLatencyVal').innerText = data.database.latencyMs;
+        document.getElementById('dbStatusVal').innerText = 'Supabase Status: ' + data.database.status;
+        document.getElementById('dbStatusVal').style.color = data.database.status === 'HEALTHY' ? '#10b981' : '#ef4444';
+
+        document.getElementById('lastUpdated').innerText = 'Live ' + new Date().toLocaleTimeString();
+
+        // Update Table
+        rawMetrics = data.apiMetrics || [];
+        renderTable(rawMetrics);
+      } catch (err) {
+        console.error('Failed to fetch system metrics:', err);
+      }
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('metricsTable');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No API calls recorded yet. Hit some endpoints in Postman/Swagger!</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(m => {
+        let latClass = 'lat-fast';
+        if (m.averageLatencyMs > 100 && m.averageLatencyMs <= 300) latClass = 'lat-med';
+        if (m.averageLatencyMs > 300) latClass = 'lat-slow';
+
+        const lastTime = new Date(m.lastRequestedAt).toLocaleTimeString();
+
+        return `
+          <tr>
+            <td><span class="method method-${m.method}">${m.method}</span></td>
+            <td style="font-weight:600; color:#fff;">${m.path}</td>
+            <td><strong>${m.totalRequests}</strong> calls</td>
+            <td><span style="color:#34d399;">✅ ${m.successfulRequests}</span> / <span style="color:#f87171;">❌ ${m.failedRequests}</span></td>
+            <td><span class="latency-tag ${latClass}">${m.averageLatencyMs} ms</span></td>
+            <td style="color:var(--text-muted);">${lastTime}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterRoutes() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = rawMetrics.filter(m => m.path.toLowerCase().includes(q) || m.method.toLowerCase().includes(q));
+      renderTable(filtered);
+    }
+
+    // Initial Load & Auto-Refresh every 3 seconds
+    fetchMetrics();
+    setInterval(fetchMetrics, 3000);
+  </script>
+
+</body>
+</html>

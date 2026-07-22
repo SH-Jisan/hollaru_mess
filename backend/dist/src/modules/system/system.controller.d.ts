@@ -27,4 +27,5 @@ export declare class SystemController {
         };
         apiMetrics: import("../../common/interceptors/metrics.interceptors").RouteMetric[];
     }>;
+    getDashboardUi(): string;
 }

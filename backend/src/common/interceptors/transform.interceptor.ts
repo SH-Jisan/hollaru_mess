@@ -8,8 +8,21 @@ export interface Response<T> {
 }
 
 @Injectable()
-export class TransformInterceptor<T> implements NestInterceptor<T, Response<T>> {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<Response<T>> {
-    return next.handle().pipe(map(data => ({ success: true, data })));
+export class TransformInterceptor<T> implements NestInterceptor<T, any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const response = context.switchToHttp().getResponse();
+
+    return next.handle().pipe(
+      map(data => {
+        // 🟢 যদি রেসপন্সটি HTML হয়, তবে এটিকে JSON-এ না মুড়ে সরাসরি র-HTML রিটার্ন করবে
+        const contentType = response.getHeader('content-type') || '';
+        if (typeof contentType === 'string' && contentType.includes('text/html')) {
+          return data;
+        }
+
+        // সাধারণ API রেসপন্সের জন্য Standard JSON Format
+        return { success: true, data };
+      }),
+    );
   }
 }
