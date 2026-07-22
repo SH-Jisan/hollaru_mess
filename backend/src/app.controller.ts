@@ -17,6 +17,18 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Get('health')
+  @ApiOperation({ summary: 'Health Check API for Render, Uptime Kuma, and Load Balancers' })
+  getHealth() {
+    return {
+      status: 'UP',
+      timestamp: new Date().toISOString(),
+      uptime: `${Math.floor(process.uptime())}s`,
+      service: 'Meal Book Backend Server',
+    };
+  }
+
+
   // ১. সাধারণ লগইন করা ইউজারদের জন্য সিকিউর রুট (MEMBER & MANAGER both)
   @Get('secure-profile')
   @UseGuards(JwtAuthGuard)

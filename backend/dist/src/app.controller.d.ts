@@ -4,6 +4,12 @@ export declare class AppController {
     private readonly appService;
     constructor(appService: AppService);
     getHello(): string;
+    getHealth(): {
+        status: string;
+        timestamp: string;
+        uptime: string;
+        service: string;
+    };
     getProfile(user: Omit<User, 'hashedPassword' | 'hashedRefreshToken'>): Omit<{
         name: string;
         id: string;

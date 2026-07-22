@@ -29,6 +29,14 @@ let AppController = class AppController {
     getHello() {
         return this.appService.getHello();
     }
+    getHealth() {
+        return {
+            status: 'UP',
+            timestamp: new Date().toISOString(),
+            uptime: `${Math.floor(process.uptime())}s`,
+            service: 'Meal Book Backend Server',
+        };
+    }
     getProfile(user) {
         return user;
     }
@@ -43,6 +51,13 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", String)
 ], AppController.prototype, "getHello", null);
+__decorate([
+    (0, common_1.Get)('health'),
+    (0, swagger_1.ApiOperation)({ summary: 'Health Check API for Render, Uptime Kuma, and Load Balancers' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "getHealth", null);
 __decorate([
     (0, common_1.Get)('secure-profile'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
