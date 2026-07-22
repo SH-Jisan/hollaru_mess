@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meal Book - Live Observability & Memory Leak Detector</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/system/dashboard.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="header">
+    <div class="title-area">
+      <div class="pulse-dot"></div>
+      <h1>Meal Book - Enterprise Observability Dashboard</h1>
+      <span class="badge" id="lastUpdated">Updating...</span>
+    </div>
+    <div style="font-size: 12px; color: var(--text-muted);">Auto-Refresh: <strong style="color:var(--success);">3s</strong></div>
+  </div>
+
+  <!-- Cards Row 1: System & DB -->
+  <div class="grid-cards">
+    <div class="card">
+      <div class="card-title">Server Uptime</div>
+      <div class="card-value" id="uptimeVal">--</div>
+      <div class="card-sub" id="uptimeSec">0s running</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Heap Memory Used</div>
+      <div class="card-value" id="heapVal">-- MB</div>
+      <div class="card-sub" id="rssVal">RSS: -- MB</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Database Latency</div>
+      <div class="card-value" id="dbLatencyVal">-- ms</div>
+      <div class="card-sub" id="dbStatusVal">Status: --</div>
+    </div>
+    <div class="card">
+      <div class="card-title">BullMQ Queue Status</div>
+      <div class="card-value" id="queueActiveVal">0 Active</div>
+      <div class="card-sub" id="queueSubVal">Waiting: 0 | Failed: 0</div>
+    </div>
+  </div>
+
+  <!-- Live Memory Trend Chart -->
+  <div class="chart-container">
+    <div class="chart-header">
+      <div style="font-size: 15px; font-weight: 600;">📈 Live Memory Trend & Memory Leak Detector</div>
+      <span class="badge" id="memLeakStatus" style="background:rgba(16,185,129,0.15); color:#34d399; border-color:rgba(16,185,129,0.3);">🟢 Memory Status: Normal</span>
+    </div>
+    <div style="height: 180px; width: 100%;">
+      <canvas id="memoryChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Swagger Style API Metrics Engine Header -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+    <div style="font-size: 16px; font-weight: 600;">⚡ Per-Route API Metrics Engine (Swagger Accordion View)</div>
+    <input type="text" id="searchInput" class="search-box" placeholder="Filter API Route..." onkeyup="filterRoutes()">
+  </div>
+
+  <!-- Swagger Accordion List Container -->
+  <div id="accordionContainer">
+    <div style="text-align:center; padding:30px; color:var(--text-muted);">Loading API endpoints...</div>
+  </div>
+
+  <script src="/system/dashboard.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -9,11 +9,12 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+  const logger = new Logger('Bootstrap');
 
-  // ১. CORS সচল করা (যাতে মোবাইল অ্যাপ এপিআই কল করতে পারে)
+  // ১. CORS সচল করা
   app.enableCors();
 
-  // ২. গ্লোবাল ডাটা ভ্যালিডেশন পাইপ যুক্ত করা (class-validator সচল করার জন্য)
+  // ২. গ্লোবাল ডাটা ভ্যালিডেশন পাইপ যুক্ত করা
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -36,10 +37,19 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  // ৫. এনভায়রনমেন্ট কনফিগারেশনের পোর্ট রিড করা
+  // ৫. এনভায়রনমেন্ট কনফিগারেশনের পোর্ট রিড ও সার্ভার লিসেন করা
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}`);
-  console.log(`Swagger documentation is available at: http://localhost:${port}/api/docs`);
+
+  // 🎨 প্রফেশনাল ও সুন্দর টার্মিনাল স্টার্টআপ ব্যানার
+  console.log('\n');
+  logger.log(`=======================================================`);
+  logger.log(` 🍲 MEAL BOOK BACKEND SERVER STARTED SUCCESSFULLY 🍲 `);
+  logger.log(`=======================================================`);
+  logger.log(` 🚀 Server Listening  : http://localhost:${port}`);
+  logger.log(` 📚 Swagger API Docs   : http://localhost:${port}/api/docs`);
+  logger.log(` 📊 Metrics Dashboard  : http://localhost:${port}/system/dashboard`);
+  logger.log(` ⚡ Health Check API   : http://localhost:${port}/system/status`);
+  logger.log(`=======================================================\n`);
 }
 bootstrap();

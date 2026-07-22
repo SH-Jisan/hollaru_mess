@@ -41,16 +41,23 @@ var __importStar = (this && this.__importStar) || (function () {
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SystemService = void 0;
 const common_1 = require("@nestjs/common");
+const bullmq_1 = require("@nestjs/bullmq");
+const bullmq_2 = require("bullmq");
 const os = __importStar(require("os"));
 const prisma_service_1 = require("../../common/prisma/prisma.service");
 const metrics_interceptors_1 = require("../../common/interceptors/metrics.interceptors");
 let SystemService = class SystemService {
     prisma;
-    constructor(prisma) {
+    notificationQueue;
+    constructor(prisma, notificationQueue) {
         this.prisma = prisma;
+        this.notificationQueue = notificationQueue;
     }
     async getSystemMetrics() {
         const memoryUsage = process.memoryUsage();
@@ -66,6 +73,18 @@ let SystemService = class SystemService {
         catch (error) {
             dbStatus = 'UNHEALTHY';
         }
+        let queueMetrics = { waiting: 0, active: 0, completed: 0, failed: 0 };
+        try {
+            const [waiting, active, completed, failed] = await Promise.all([
+                this.notificationQueue.getWaitingCount(),
+                this.notificationQueue.getActiveCount(),
+                this.notificationQueue.getCompletedCount(),
+                this.notificationQueue.getFailedCount(),
+            ]);
+            queueMetrics = { waiting, active, completed, failed };
+        }
+        catch (err) {
+        }
         return {
             status: 'OK',
             timestamp: new Date().toISOString(),
@@ -74,9 +93,9 @@ let SystemService = class SystemService {
                 formatted: this.formatUptime(process.uptime()),
             },
             memory: {
-                processRssMb: (memoryUsage.rss / 1024 / 1024).toFixed(2) + ' MB',
-                heapTotalMb: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2) + ' MB',
-                heapUsedMb: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2) + ' MB',
+                processRssMb: (memoryUsage.rss / 1024 / 1024).toFixed(2),
+                heapTotalMb: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2),
+                heapUsedMb: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2),
                 systemTotalRamGb: (systemTotalMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
                 systemFreeRamGb: (systemFreeMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
             },
@@ -89,6 +108,7 @@ let SystemService = class SystemService {
                 status: dbStatus,
                 latencyMs: `${dbLatencyMs} ms`,
             },
+            queue: queueMetrics,
             apiMetrics: metrics_interceptors_1.MetricsInterceptor.getMetricsList(),
         };
     }
@@ -103,6 +123,8 @@ let SystemService = class SystemService {
 exports.SystemService = SystemService;
 exports.SystemService = SystemService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __param(1, (0, bullmq_1.InjectQueue)('notification-queue')),
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        bullmq_2.Queue])
 ], SystemService);
 //# sourceMappingURL=system.service.js.map

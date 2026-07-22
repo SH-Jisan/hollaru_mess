@@ -25,7 +25,16 @@ export declare class SystemController {
             status: string;
             latencyMs: string;
         };
+        queue: {
+            waiting: number;
+            active: number;
+            completed: number;
+            failed: number;
+        };
         apiMetrics: import("../../common/interceptors/metrics.interceptors").RouteMetric[];
     }>;
     getDashboardUi(): string;
+    getDashboardCss(): string;
+    getDashboardJs(): string;
+    private readFile;
 }

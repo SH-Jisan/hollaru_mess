@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SystemModule = void 0;
 const common_1 = require("@nestjs/common");
+const bullmq_1 = require("@nestjs/bullmq");
 const system_controller_1 = require("./system.controller");
 const system_service_1 = require("./system.service");
 let SystemModule = class SystemModule {
@@ -15,8 +16,13 @@ let SystemModule = class SystemModule {
 exports.SystemModule = SystemModule;
 exports.SystemModule = SystemModule = __decorate([
     (0, common_1.Module)({
+        imports: [
+            bullmq_1.BullModule.registerQueue({
+                name: 'notification-queue',
+            }),
+        ],
         controllers: [system_controller_1.SystemController],
-        providers: [system_service_1.SystemService]
+        providers: [system_service_1.SystemService],
     })
 ], SystemModule);
 //# sourceMappingURL=system.module.js.map

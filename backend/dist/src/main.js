@@ -10,6 +10,7 @@ const transform_interceptor_1 = require("./common/interceptors/transform.interce
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     const configService = app.get(config_1.ConfigService);
+    const logger = new common_1.Logger('Bootstrap');
     app.enableCors();
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
@@ -28,8 +29,15 @@ async function bootstrap() {
     swagger_1.SwaggerModule.setup('api/docs', app, document);
     const port = configService.get('PORT') || 3000;
     await app.listen(port);
-    console.log(`Application is running on: http://localhost:${port}`);
-    console.log(`Swagger documentation is available at: http://localhost:${port}/api/docs`);
+    console.log('\n');
+    logger.log(`=======================================================`);
+    logger.log(` 🍲 MEAL BOOK BACKEND SERVER STARTED SUCCESSFULLY 🍲 `);
+    logger.log(`=======================================================`);
+    logger.log(` 🚀 Server Listening  : http://localhost:${port}`);
+    logger.log(` 📚 Swagger API Docs   : http://localhost:${port}/api/docs`);
+    logger.log(` 📊 Metrics Dashboard  : http://localhost:${port}/system/dashboard`);
+    logger.log(` ⚡ Health Check API   : http://localhost:${port}/system/status`);
+    logger.log(`=======================================================\n`);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

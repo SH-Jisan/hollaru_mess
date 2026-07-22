@@ -14,7 +14,9 @@ let TransformInterceptor = class TransformInterceptor {
         const response = context.switchToHttp().getResponse();
         return next.handle().pipe((0, operators_1.map)(data => {
             const contentType = response.getHeader('content-type') || '';
-            if (typeof contentType === 'string' && contentType.includes('text/html')) {
+            if (typeof contentType === 'string' &&
+                contentType.length > 0 &&
+                !contentType.includes('application/json')) {
                 return data;
             }
             return { success: true, data };

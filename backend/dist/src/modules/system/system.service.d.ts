@@ -1,7 +1,9 @@
+import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
 export declare class SystemService {
     private prisma;
-    constructor(prisma: PrismaService);
+    private notificationQueue;
+    constructor(prisma: PrismaService, notificationQueue: Queue);
     getSystemMetrics(): Promise<{
         status: string;
         timestamp: string;
@@ -24,6 +26,12 @@ export declare class SystemService {
         database: {
             status: string;
             latencyMs: string;
+        };
+        queue: {
+            waiting: number;
+            active: number;
+            completed: number;
+            failed: number;
         };
         apiMetrics: import("../../common/interceptors/metrics.interceptors").RouteMetric[];
     }>;

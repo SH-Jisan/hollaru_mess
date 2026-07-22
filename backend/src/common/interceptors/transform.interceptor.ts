@@ -14,13 +14,18 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
 
     return next.handle().pipe(
       map(data => {
-        // 🟢 যদি রেসপন্সটি HTML হয়, তবে এটিকে JSON-এ না মুড়ে সরাসরি র-HTML রিটার্ন করবে
         const contentType = response.getHeader('content-type') || '';
-        if (typeof contentType === 'string' && contentType.includes('text/html')) {
+
+        // 🟢 যদি Content-Type জেসন (JSON) না হয়ে স্ট্যাটিক ফাইল (HTML, CSS, JS) হয়, তবে ডাটা সরাসরি র-পাঠাবে
+        if (
+          typeof contentType === 'string' &&
+          contentType.length > 0 &&
+          !contentType.includes('application/json')
+        ) {
           return data;
         }
 
-        // সাধারণ API রেসপন্সের জন্য Standard JSON Format
+        // সাধারণ এপিআই রেসপন্সের জন্য Standard JSON Format
         return { success: true, data };
       }),
     );

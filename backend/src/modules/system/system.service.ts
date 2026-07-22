@@ -1,11 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import * as os from 'os';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { MetricsInterceptor } from '../../common/interceptors/metrics.interceptors'; // 👈 ১. ইমপোর্ট করা
+import { MetricsInterceptor } from '../../common/interceptors/metrics.interceptors';
 
 @Injectable()
 export class SystemService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @InjectQueue('notification-queue') private notificationQueue: Queue,
+  ) {}
 
   async getSystemMetrics() {
     const memoryUsage = process.memoryUsage();
@@ -23,6 +28,20 @@ export class SystemService {
       dbStatus = 'UNHEALTHY';
     }
 
+    // 📬 BullMQ Queue Job Counters
+    let queueMetrics = { waiting: 0, active: 0, completed: 0, failed: 0 };
+    try {
+      const [waiting, active, completed, failed] = await Promise.all([
+        this.notificationQueue.getWaitingCount(),
+        this.notificationQueue.getActiveCount(),
+        this.notificationQueue.getCompletedCount(),
+        this.notificationQueue.getFailedCount(),
+      ]);
+      queueMetrics = { waiting, active, completed, failed };
+    } catch (err) {
+      // Queue offline gracefully handled
+    }
+
     return {
       status: 'OK',
       timestamp: new Date().toISOString(),
@@ -31,9 +50,9 @@ export class SystemService {
         formatted: this.formatUptime(process.uptime()),
       },
       memory: {
-        processRssMb: (memoryUsage.rss / 1024 / 1024).toFixed(2) + ' MB',
-        heapTotalMb: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2) + ' MB',
-        heapUsedMb: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2) + ' MB',
+        processRssMb: (memoryUsage.rss / 1024 / 1024).toFixed(2),
+        heapTotalMb: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2),
+        heapUsedMb: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2),
         systemTotalRamGb: (systemTotalMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
         systemFreeRamGb: (systemFreeMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
       },
@@ -46,7 +65,8 @@ export class SystemService {
         status: dbStatus,
         latencyMs: `${dbLatencyMs} ms`,
       },
-      apiMetrics: MetricsInterceptor.getMetricsList(), // 👈 ২. প্রতি এপিআই-এর পারফরম্যান্স মেট্রিক্স যুক্ত করা
+      queue: queueMetrics,
+      apiMetrics: MetricsInterceptor.getMetricsList(),
     };
   }
 

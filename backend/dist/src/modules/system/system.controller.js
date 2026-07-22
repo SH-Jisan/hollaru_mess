@@ -57,8 +57,17 @@ let SystemController = class SystemController {
         return this.systemService.getSystemMetrics();
     }
     getDashboardUi() {
-        const distPath = path.join(__dirname, 'dashboard.html');
-        const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashboard.html');
+        return this.readFile('dashboard.html');
+    }
+    getDashboardCss() {
+        return this.readFile('dashboard.css');
+    }
+    getDashboardJs() {
+        return this.readFile('dashboard.js');
+    }
+    readFile(fileName) {
+        const distPath = path.join(__dirname, 'dashborad_ui', fileName);
+        const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashborad_ui', fileName);
         const filePath = fs.existsSync(distPath) ? distPath : srcPath;
         return fs.readFileSync(filePath, 'utf8');
     }
@@ -80,6 +89,20 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", String)
 ], SystemController.prototype, "getDashboardUi", null);
+__decorate([
+    (0, common_1.Get)('dashboard.css'),
+    (0, common_1.Header)('Content-Type', 'text/css'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", String)
+], SystemController.prototype, "getDashboardCss", null);
+__decorate([
+    (0, common_1.Get)('dashboard.js'),
+    (0, common_1.Header)('Content-Type', 'application/javascript'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", String)
+], SystemController.prototype, "getDashboardJs", null);
 exports.SystemController = SystemController = __decorate([
     (0, swagger_1.ApiTags)('System & Health Status'),
     (0, common_1.Controller)('system'),
