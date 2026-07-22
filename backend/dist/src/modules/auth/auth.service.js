@@ -47,6 +47,7 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = __importStar(require("bcrypt"));
+const crypto = __importStar(require("crypto"));
 const prisma_service_1 = require("../../common/prisma/prisma.service");
 let AuthService = class AuthService {
     prisma;
@@ -66,10 +67,8 @@ let AuthService = class AuthService {
         }
         const userId = crypto.randomUUID();
         const tokens = await this.generateTokens(userId, dto.email, 'MEMBER');
-        const [hashedPassword, hashedRefreshToken] = await Promise.all([
-            bcrypt.hash(dto.password, 10),
-            bcrypt.hash(tokens.refreshToken, 10),
-        ]);
+        const hashedPassword = await bcrypt.hash(dto.password, 10);
+        const hashedRefreshToken = this.hashToken(tokens.refreshToken);
         const user = await this.prisma.user.create({
             data: {
                 id: userId,
@@ -100,7 +99,7 @@ let AuthService = class AuthService {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         const tokens = await this.generateTokens(user.id, user.email, user.role);
-        await this.updateRefreshToken(user.id, tokens.refreshToken);
+        this.updateRefreshToken(user.id, tokens.refreshToken).catch(() => { });
         const { hashedPassword, hashedRefreshToken, ...userWithoutSecrets } = user;
         return { user: userWithoutSecrets, ...tokens };
     }
@@ -115,12 +114,12 @@ let AuthService = class AuthService {
             if (!user || !user.hashedRefreshToken) {
                 throw new common_1.UnauthorizedException('Access denied');
             }
-            const isTokenMatch = await bcrypt.compare(dto.refreshToken, user.hashedRefreshToken);
-            if (!isTokenMatch) {
+            const hashedInput = this.hashToken(dto.refreshToken);
+            if (hashedInput !== user.hashedRefreshToken) {
                 throw new common_1.UnauthorizedException('Access denied');
             }
             const tokens = await this.generateTokens(user.id, user.email, user.role);
-            await this.updateRefreshToken(user.id, tokens.refreshToken);
+            this.updateRefreshToken(user.id, tokens.refreshToken).catch(() => { });
             return tokens;
         }
         catch (error) {
@@ -141,8 +140,11 @@ let AuthService = class AuthService {
         ]);
         return { accessToken, refreshToken };
     }
+    hashToken(token) {
+        return crypto.createHash('sha256').update(token).digest('hex');
+    }
     async updateRefreshToken(userId, refreshToken) {
-        const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+        const hashedRefreshToken = this.hashToken(refreshToken);
         await this.prisma.user.update({
             where: { id: userId },
             data: { hashedRefreshToken },

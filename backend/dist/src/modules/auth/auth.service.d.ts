@@ -38,5 +38,6 @@ export declare class AuthService {
         refreshToken: string;
     }>;
     private generateTokens;
+    private hashToken;
     private updateRefreshToken;
 }
