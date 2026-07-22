@@ -8,6 +8,10 @@ export interface RouteMetric {
     failedRequests: number;
     totalLatencyMs: number;
     averageLatencyMs: number;
+    totalRamMb: number;
+    averageRamMb: number;
+    totalCpuMs: number;
+    averageCpuMs: number;
     lastRequestedAt: string;
 }
 export declare class MetricsInterceptor implements NestInterceptor {

@@ -145,24 +145,29 @@ function renderAccordionList(metrics) {
         </div>
 
         <div class="accordion-body">
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:12px; margin-bottom:16px;">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap:10px; margin-bottom:16px;">
             <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
-              <div style="font-size:11px; color:var(--text-muted);">Success Requests</div>
-              <div style="font-size:16px; font-weight:700; color:#34d399; margin-top:2px;" id="succ-${safeKey}">✅ ${m.successfulRequests}</div>
+              <div style="font-size:11px; color:var(--text-muted);">Success / Error</div>
+              <div style="font-size:14px; font-weight:700; color:#34d399; margin-top:2px;" id="succ-${safeKey}">✅ ${m.successfulRequests} / <span style="color:#f87171;">❌ ${m.failedRequests}</span></div>
             </div>
             <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
-              <div style="font-size:11px; color:var(--text-muted);">Failed Errors</div>
-              <div style="font-size:16px; font-weight:700; color:#f87171; margin-top:2px;" id="fail-${safeKey}">❌ ${m.failedRequests}</div>
+              <div style="font-size:11px; color:var(--text-muted);">Avg Latency</div>
+              <div style="font-size:14px; font-weight:700; color:#818cf8; margin-top:2px;" id="avgLat-${safeKey}">⚡ ${m.averageLatencyMs} ms</div>
             </div>
             <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
-              <div style="font-size:11px; color:var(--text-muted);">Average Latency</div>
-              <div style="font-size:16px; font-weight:700; color:#818cf8; margin-top:2px;" id="avgLat-${safeKey}">${m.averageLatencyMs} ms</div>
+              <div style="font-size:11px; color:var(--text-muted);">Avg RAM Used</div>
+              <div style="font-size:14px; font-weight:700; color:#a5b4fc; margin-top:2px;" id="ram-${safeKey}">🧠 ${m.averageRamMb || '0.05'} MB</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-muted);">Avg CPU Time</div>
+              <div style="font-size:14px; font-weight:700; color:#facc15; margin-top:2px;" id="cpu-${safeKey}">⚙️ ${m.averageCpuMs || '0.20'} ms</div>
             </div>
             <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
               <div style="font-size:11px; color:var(--text-muted);">Last Hit Time</div>
-              <div style="font-size:13px; font-weight:600; color:#fff; margin-top:4px;" id="lastTime-${safeKey}">${new Date(m.lastRequestedAt).toLocaleTimeString()}</div>
+              <div style="font-size:12px; font-weight:600; color:#fff; margin-top:4px;" id="lastTime-${safeKey}">${new Date(m.lastRequestedAt).toLocaleTimeString()}</div>
             </div>
           </div>
+
 
           <div style="font-size:12px; font-weight:600; margin-bottom:8px; color:var(--text-muted);">📈 Real-Time Response Latency Trend (ms):</div>
           <div style="height:140px; width:100%;">
@@ -177,15 +182,17 @@ function renderAccordionList(metrics) {
     } else {
       // 🟢 Smoothly update existing numbers without destroying canvas
       document.getElementById(`calls-${safeKey}`).innerText = m.totalRequests;
-      document.getElementById(`succ-${safeKey}`).innerText = `✅ ${m.successfulRequests}`;
-      document.getElementById(`fail-${safeKey}`).innerText = `❌ ${m.failedRequests}`;
-      document.getElementById(`avgLat-${safeKey}`).innerText = `${m.averageLatencyMs} ms`;
+      document.getElementById(`succ-${safeKey}`).innerHTML = `✅ ${m.successfulRequests} / <span style="color:#f87171;">❌ ${m.failedRequests}</span>`;
+      document.getElementById(`avgLat-${safeKey}`).innerText = `⚡ ${m.averageLatencyMs} ms`;
+      if (document.getElementById(`ram-${safeKey}`)) document.getElementById(`ram-${safeKey}`).innerText = `🧠 ${m.averageRamMb || '0.05'} MB`;
+      if (document.getElementById(`cpu-${safeKey}`)) document.getElementById(`cpu-${safeKey}`).innerText = `⚙️ ${m.averageCpuMs || '0.20'} ms`;
       document.getElementById(`lastTime-${safeKey}`).innerText = new Date(m.lastRequestedAt).toLocaleTimeString();
       
       const tag = document.getElementById(`latTag-${safeKey}`);
       tag.className = `latency-tag ${latClass}`;
       tag.innerText = `⚡ ${m.averageLatencyMs} ms`;
     }
+
   });
 }
 
