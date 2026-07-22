@@ -16,6 +16,7 @@ export interface RouteMetric {
 }
 export declare class MetricsInterceptor implements NestInterceptor {
     private static metricsMap;
+    private static readonly MAX_MAP_SIZE;
     intercept(context: ExecutionContext, next: CallHandler): Observable<any>;
     static getMetricsList(): RouteMetric[];
 }

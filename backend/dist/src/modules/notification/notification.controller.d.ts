@@ -12,11 +12,11 @@ export declare class NotificationController {
         id: string;
     }): Promise<{
         id: string;
-        createdAt: Date;
         title: string;
-        userId: string;
         body: string;
         isRead: boolean;
+        createdAt: Date;
+        userId: string;
     }[]>;
     markAsRead(id: string, user: {
         id: string;

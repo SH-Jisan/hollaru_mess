@@ -7,6 +7,10 @@ import { SystemService } from './system.service';
   imports: [
     BullModule.registerQueue({
       name: 'notification-queue',
+      defaultJobOptions: {
+        removeOnComplete: 100, // 🟢 শেষ ১০০টি সফল জব রেখে বাকিগুলো মেমোরি থেকে মুছে ফেলবে
+        removeOnFail: 200,     // 🟢 শেষ ২০০টি ব্যর্থ জব রেখে বাকিগুলো মেমোরি থেকে ডিলিট করবে
+      },
     }),
   ],
   controllers: [SystemController],

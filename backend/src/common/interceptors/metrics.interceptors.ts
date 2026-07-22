@@ -25,13 +25,15 @@ export interface RouteMetric {
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
   private static metricsMap = new Map<string, RouteMetric>();
+  private static readonly MAX_MAP_SIZE = 500; // 🟢 ১. মেমোরি লিক রোধে সর্বোচ্চ ৫০০টি এপিআই কি লিমিট
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
     const { method, route } = request;
 
-    const path = route ? route.path : request.url;
+    // 🟢 ২. কুয়েরি প্যারাম বাদ দিয়ে ক্লিন ইউআরএল নেওয়া
+    const path = route ? route.path : request.url.split('?')[0];
     const metricKey = `${method}:${path}`;
     const startTime = Date.now();
     const startMem = process.memoryUsage().heapUsed;
@@ -47,6 +49,15 @@ export class MetricsInterceptor implements NestInterceptor {
         const cpuMs = Number(((endCpu.user + endCpu.system) / 1000).toFixed(2));
         const statusCode = response.statusCode;
         const isSuccess = statusCode >= 200 && statusCode < 400;
+
+        // 🟢 ৩. মেমোরি লিক প্রোটেকশন: ৫০০ কি সীমা অতিক্রম করলে সবচেয়ে পুরনোটি ডিলিট করবে
+        if (
+          MetricsInterceptor.metricsMap.size >= MetricsInterceptor.MAX_MAP_SIZE &&
+          !MetricsInterceptor.metricsMap.has(metricKey)
+        ) {
+          const firstKey = MetricsInterceptor.metricsMap.keys().next().value;
+          if (firstKey) MetricsInterceptor.metricsMap.delete(firstKey);
+        }
 
         const existing = MetricsInterceptor.metricsMap.get(metricKey) || {
           path,
@@ -92,4 +103,3 @@ export class MetricsInterceptor implements NestInterceptor {
     return Array.from(MetricsInterceptor.metricsMap.values());
   }
 }
-

@@ -19,6 +19,10 @@ exports.SystemModule = SystemModule = __decorate([
         imports: [
             bullmq_1.BullModule.registerQueue({
                 name: 'notification-queue',
+                defaultJobOptions: {
+                    removeOnComplete: 100,
+                    removeOnFail: 200,
+                },
             }),
         ],
         controllers: [system_controller_1.SystemController],

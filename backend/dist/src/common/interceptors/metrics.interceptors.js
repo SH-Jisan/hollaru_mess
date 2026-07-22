@@ -13,11 +13,12 @@ const operators_1 = require("rxjs/operators");
 let MetricsInterceptor = class MetricsInterceptor {
     static { MetricsInterceptor_1 = this; }
     static metricsMap = new Map();
+    static MAX_MAP_SIZE = 500;
     intercept(context, next) {
         const request = context.switchToHttp().getRequest();
         const response = context.switchToHttp().getResponse();
         const { method, route } = request;
-        const path = route ? route.path : request.url;
+        const path = route ? route.path : request.url.split('?')[0];
         const metricKey = `${method}:${path}`;
         const startTime = Date.now();
         const startMem = process.memoryUsage().heapUsed;
@@ -30,6 +31,12 @@ let MetricsInterceptor = class MetricsInterceptor {
             const cpuMs = Number(((endCpu.user + endCpu.system) / 1000).toFixed(2));
             const statusCode = response.statusCode;
             const isSuccess = statusCode >= 200 && statusCode < 400;
+            if (MetricsInterceptor_1.metricsMap.size >= MetricsInterceptor_1.MAX_MAP_SIZE &&
+                !MetricsInterceptor_1.metricsMap.has(metricKey)) {
+                const firstKey = MetricsInterceptor_1.metricsMap.keys().next().value;
+                if (firstKey)
+                    MetricsInterceptor_1.metricsMap.delete(firstKey);
+            }
             const existing = MetricsInterceptor_1.metricsMap.get(metricKey) || {
                 path,
                 method,

@@ -69,6 +69,8 @@ export class NotificationService implements OnModuleInit {
       select: { id: true, fcmToken: true },
     });
 
+    if(!members.length) return;
+
     const notificationEntries = members.map((member) => ({
       userId: member.id,
       title,
@@ -83,10 +85,14 @@ export class NotificationService implements OnModuleInit {
 
     if (tokens.length > 0 && this.firebaseInitialized) {
       try {
-        await getMessaging().sendEachForMulticast({
-          tokens,
-          notification: { title, body },
-        });
+        const batchSize = 500;
+        for (let i = 0; i<tokens.length; i+=batchSize){
+          const batchTokens = tokens.slice(i, i+batchSize);
+          await getMessaging().sendEachForMulticast({
+            tokens: batchTokens,
+            notification: {title, body},
+          });
+        }
         this.logger.log(`Multicast push sent to mess: ${messId} (${tokens.length} devices)`);
       } catch (error) {
         this.logger.error(`Failed multicast push to mess: ${messId}`, error);
