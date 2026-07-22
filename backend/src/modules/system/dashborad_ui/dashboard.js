@@ -132,7 +132,8 @@ function renderAccordionList(metrics) {
       itemEl.setAttribute('data-key', key);
 
       itemEl.innerHTML = `
-        <div class="accordion-header" onclick="toggleAccordion('${safeKey}')">
+        <div class="accordion-header" onclick="toggleAccordion('${key}', '${safeKey}')">
+
           <div class="accordion-left">
             <span class="method method-${m.method}">${m.method}</span>
             <span style="font-weight:600; color:#fff; font-size:14px;">${m.path}</span>
@@ -177,8 +178,7 @@ function renderAccordionList(metrics) {
       `;
       container.appendChild(itemEl);
 
-      // Initialize Chart for this canvas once
-      setTimeout(() => initRouteChart(key, safeKey), 50);
+      container.appendChild(itemEl);
     } else {
       // 🟢 Smoothly update existing numbers without destroying canvas
       document.getElementById(`calls-${safeKey}`).innerText = m.totalRequests;
@@ -192,16 +192,20 @@ function renderAccordionList(metrics) {
       tag.className = `latency-tag ${latClass}`;
       tag.innerText = `⚡ ${m.averageLatencyMs} ms`;
     }
-
   });
 }
 
-function toggleAccordion(safeKey) {
+function toggleAccordion(key, safeKey) {
   const item = document.getElementById(`item-${safeKey}`);
-  if (item) {
-    item.classList.toggle('collapsed');
+  if (!item) return;
+  
+  item.classList.toggle('active');
+  
+  if (item.classList.contains('active')) {
+    setTimeout(() => initRouteChart(key, safeKey), 50);
   }
 }
+
 
 function initRouteChart(key, safeKey) {
   const canvas = document.getElementById(`chart-${safeKey}`);

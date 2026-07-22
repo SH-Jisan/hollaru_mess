@@ -64,13 +64,20 @@ let AuthService = class AuthService {
         if (existingUser) {
             throw new common_1.ConflictException('Email already registered');
         }
-        const hashedPassword = await bcrypt.hash(dto.password, 10);
+        const userId = crypto.randomUUID();
+        const tokens = await this.generateTokens(userId, dto.email, 'MEMBER');
+        const [hashedPassword, hashedRefreshToken] = await Promise.all([
+            bcrypt.hash(dto.password, 10),
+            bcrypt.hash(tokens.refreshToken, 10),
+        ]);
         const user = await this.prisma.user.create({
             data: {
+                id: userId,
                 name: dto.name,
                 email: dto.email,
                 phone: dto.phone,
                 hashedPassword,
+                hashedRefreshToken,
             },
             select: {
                 id: true,
@@ -79,8 +86,6 @@ let AuthService = class AuthService {
                 role: true,
             },
         });
-        const tokens = await this.generateTokens(user.id, user.email, user.role);
-        await this.updateRefreshToken(user.id, tokens.refreshToken);
         return { user, ...tokens };
     }
     async login(dto) {

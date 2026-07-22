@@ -13,11 +13,12 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) {}
+  ) { }
 
   // ১. মেম্বার রেজিস্ট্রেশন লজিক
+    // ১. মেম্বার রেজিস্ট্রেশন লজিক (Optimized: Parallel Bcrypt + Single DB Query)
   async register(dto: RegisterDto) {
-    // ইমেইলটি অলরেডি ডাটাবেজে আছে কিনা চেক করা
+    // ১. ইমেইলটি অলরেডি ডাটাবেজে আছে কিনা চেক করা
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -26,16 +27,25 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    // পাসওয়ার্ড হ্যাশ করা (Bcrypt)
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    // ২. ডাটাবেজে ইনসার্টের আগেই প্রাক-নির্ধারিত ইউনিক আইডি ও টোকেন বানিয়ে ফেলা
+    const userId = crypto.randomUUID();
+    const tokens = await this.generateTokens(userId, dto.email, 'MEMBER');
 
-    // ডাটাবেজে ইউজার সেভ করা
+    // ⚡ ৩. Parallel Bcrypt Execution (পাসওয়ার্ড হ্যাশ ও রিফ্রেশ টোকেন হ্যাশ একসাথে সিপিইউতে হবে)
+    const [hashedPassword, hashedRefreshToken] = await Promise.all([
+      bcrypt.hash(dto.password, 10),
+      bcrypt.hash(tokens.refreshToken, 10),
+    ]);
+
+    // ⚡ ৪. Single DB Query (১টি মাত্র ইনসার্ট ক্যূয়েরিতে ইউজার ও হ্যাশ করা রিফ্রেশ টোকেন একবারে সেভ করা)
     const user = await this.prisma.user.create({
       data: {
+        id: userId,
         name: dto.name,
         email: dto.email,
         phone: dto.phone,
         hashedPassword,
+        hashedRefreshToken, // 👈 একসাথে সেভ হওয়ায় ২য় কোনো আপডেট ক্যূয়েরি লাগবে না
       },
       select: {
         id: true,
@@ -45,12 +55,9 @@ export class AuthService {
       },
     });
 
-    // নতুন ইউজারের জন্য টোকেন জেনারেট করা
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
-
     return { user, ...tokens };
   }
+
 
   // ২. লগইন ভেরিফিকেশন লজিক
   async login(dto: LoginDto) {

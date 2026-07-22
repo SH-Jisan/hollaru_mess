@@ -1,4 +1,5 @@
 import { CallHandler, ExecutionContext, NestInterceptor } from '@nestjs/common';
+import type { Cache } from 'cache-manager';
 import { Observable } from 'rxjs';
 export interface RouteMetric {
     path: string;
@@ -15,8 +16,14 @@ export interface RouteMetric {
     lastRequestedAt: string;
 }
 export declare class MetricsInterceptor implements NestInterceptor {
+    private cacheManager;
     private static metricsMap;
     private static readonly MAX_MAP_SIZE;
+    constructor(cacheManager: Cache);
     intercept(context: ExecutionContext, next: CallHandler): Observable<any>;
+    static initializeRegisteredRoutes(routes: Array<{
+        method: string;
+        path: string;
+    }>): void;
     static getMetricsList(): RouteMetric[];
 }

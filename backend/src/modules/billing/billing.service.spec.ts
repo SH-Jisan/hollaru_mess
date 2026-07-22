@@ -7,7 +7,7 @@ import { BillingService } from './billing.service';
 describe('BillingService (Unit Tests)', () => {
   let service: BillingService;
 
-  const mockPrismaService = {
+  const mockPrismaService: any = {
     monthlyData: { create: jest.fn(), update: jest.fn() },
     mess: { update: jest.fn() },
     bazaarItem: { aggregate: jest.fn().mockResolvedValue({ _sum: { cost: 6000 } }) },

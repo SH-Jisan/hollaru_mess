@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
 import { SystemController } from './system.controller';
 import { SystemService } from './system.service';
@@ -12,6 +13,7 @@ import { SystemService } from './system.service';
         removeOnFail: 200,     // 🟢 শেষ ২০০টি ব্যর্থ জব রেখে বাকিগুলো মেমোরি থেকে ডিলিট করবে
       },
     }),
+    ScheduleModule.forRoot(),
   ],
   controllers: [SystemController],
   providers: [SystemService],

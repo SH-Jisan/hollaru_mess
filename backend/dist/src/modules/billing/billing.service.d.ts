@@ -15,7 +15,7 @@ export declare class BillingService {
         isClosed: boolean;
         totalBazaarCost: number;
     }>;
-    getMonthSummary(userId: string): Promise<{}>;
+    getMonthSummary(userId: string): Promise<any>;
     closeMonthSession(managerId: string): Promise<{
         message: string;
     }>;

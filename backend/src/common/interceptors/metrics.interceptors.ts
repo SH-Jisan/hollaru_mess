@@ -1,9 +1,12 @@
 import {
   CallHandler,
   ExecutionContext,
+  Inject,
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
@@ -25,14 +28,15 @@ export interface RouteMetric {
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
   private static metricsMap = new Map<string, RouteMetric>();
-  private static readonly MAX_MAP_SIZE = 500; // 🟢 ১. মেমোরি লিক রোধে সর্বোচ্চ ৫০০টি এপিআই কি লিমিট
+  private static readonly MAX_MAP_SIZE = 500;
+
+  constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
     const { method, route } = request;
 
-    // 🟢 ২. কুয়েরি প্যারাম বাদ দিয়ে ক্লিন ইউআরএল নেওয়া
     const path = route ? route.path : request.url.split('?')[0];
     const metricKey = `${method}:${path}`;
     const startTime = Date.now();
@@ -40,7 +44,7 @@ export class MetricsInterceptor implements NestInterceptor {
     const startCpu = process.cpuUsage();
 
     return next.handle().pipe(
-      tap(() => {
+      tap(async () => {
         const duration = Date.now() - startTime;
         const endMem = process.memoryUsage().heapUsed;
         const endCpu = process.cpuUsage(startCpu);
@@ -50,15 +54,7 @@ export class MetricsInterceptor implements NestInterceptor {
         const statusCode = response.statusCode;
         const isSuccess = statusCode >= 200 && statusCode < 400;
 
-        // 🟢 ৩. মেমোরি লিক প্রোটেকশন: ৫০০ কি সীমা অতিক্রম করলে সবচেয়ে পুরনোটি ডিলিট করবে
-        if (
-          MetricsInterceptor.metricsMap.size >= MetricsInterceptor.MAX_MAP_SIZE &&
-          !MetricsInterceptor.metricsMap.has(metricKey)
-        ) {
-          const firstKey = MetricsInterceptor.metricsMap.keys().next().value;
-          if (firstKey) MetricsInterceptor.metricsMap.delete(firstKey);
-        }
-
+        // ১. ইন-মেমোরি ম্যাপ আপডেট
         const existing = MetricsInterceptor.metricsMap.get(metricKey) || {
           path,
           method,
@@ -75,28 +71,54 @@ export class MetricsInterceptor implements NestInterceptor {
         };
 
         existing.totalRequests += 1;
-        if (isSuccess) {
-          existing.successfulRequests += 1;
-        } else {
-          existing.failedRequests += 1;
-        }
+        if (isSuccess) existing.successfulRequests += 1;
+        else existing.failedRequests += 1;
 
         existing.totalLatencyMs += duration;
-        existing.averageLatencyMs = Number(
-          (existing.totalLatencyMs / existing.totalRequests).toFixed(2),
-        );
+        existing.averageLatencyMs = Number((existing.totalLatencyMs / existing.totalRequests).toFixed(2));
 
         existing.totalRamMb = Number((existing.totalRamMb + ramDelta).toFixed(2));
         existing.averageRamMb = Number((existing.totalRamMb / existing.totalRequests).toFixed(2));
 
         existing.totalCpuMs = Number((existing.totalCpuMs + cpuMs).toFixed(2));
         existing.averageCpuMs = Number((existing.totalCpuMs / existing.totalRequests).toFixed(2));
-
         existing.lastRequestedAt = new Date().toISOString();
 
         MetricsInterceptor.metricsMap.set(metricKey, existing);
+
+        // ⚡ ২. Upstash Redis-এ ৩০ দিনের TTL (2592000 seconds) দিয়ে সেভ করা
+        try {
+          const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
+          const redisKey = `metrics:monthly:${currentMonth}:${metricKey}`;
+          const ttlSeconds = 30 * 24 * 60 * 60; // 30 Days Auto Expiration
+          await this.cacheManager.set(redisKey, existing, ttlSeconds);
+        } catch (err) {
+          // Redis Exception Handling
+        }
       }),
     );
+  }
+
+  static initializeRegisteredRoutes(routes: Array<{ method: string; path: string }>) {
+    routes.forEach(({ method, path }) => {
+      const metricKey = `${method}:${path}`;
+      if (!MetricsInterceptor.metricsMap.has(metricKey)) {
+        MetricsInterceptor.metricsMap.set(metricKey, {
+          path,
+          method,
+          totalRequests: 0,
+          successfulRequests: 0,
+          failedRequests: 0,
+          totalLatencyMs: 0,
+          averageLatencyMs: 0,
+          totalRamMb: 0,
+          averageRamMb: 0,
+          totalCpuMs: 0,
+          averageCpuMs: 0,
+          lastRequestedAt: new Date().toISOString(),
+        });
+      }
+    });
   }
 
   static getMetricsList(): RouteMetric[] {

@@ -7,7 +7,7 @@ import { MessService } from './mess.service';
 describe('MessService (Unit Tests)', () => {
   let service: MessService;
 
-  const mockPrismaService = {
+  const mockPrismaService: any = {
     mess: {
       create: jest.fn().mockResolvedValue({ id: 'mess_123', name: 'Dream Mess', code: '4921' }),
       findUnique: jest.fn(),
@@ -51,10 +51,10 @@ describe('MessService (Unit Tests)', () => {
   });
 
   it('should create a mess and assign 4-digit code', async () => {
-    const result = await service.createMess('user_123', {
-      name: 'Dream Mess',
-      address: 'Dhanmondi, Dhaka',
-    });
+    const result = await service.createMess(
+      { name: 'Dream Mess' },
+      'user_123',
+    );
 
     expect(result).toHaveProperty('code');
     expect(result.name).toBe('Dream Mess');

@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SystemModule = void 0;
 const common_1 = require("@nestjs/common");
+const schedule_1 = require("@nestjs/schedule");
 const bullmq_1 = require("@nestjs/bullmq");
 const system_controller_1 = require("./system.controller");
 const system_service_1 = require("./system.service");
@@ -24,6 +25,7 @@ exports.SystemModule = SystemModule = __decorate([
                     removeOnFail: 200,
                 },
             }),
+            schedule_1.ScheduleModule.forRoot(),
         ],
         controllers: [system_controller_1.SystemController],
         providers: [system_service_1.SystemService],

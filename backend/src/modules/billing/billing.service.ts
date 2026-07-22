@@ -57,7 +57,7 @@ export class BillingService {
     const cacheKey = `billing:${mess.id}:${monthId}:summary`;
 
     // ⚡ ১. ক্যাশে চেক করা
-    const cachedSummary = await this.cacheManager.get(cacheKey);
+    const cachedSummary = await this.cacheManager.get<any>(cacheKey);
     if (cachedSummary) {
       return cachedSummary; // 0ms রেসপন্স!
     }

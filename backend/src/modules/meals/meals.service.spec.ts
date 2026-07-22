@@ -4,6 +4,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { MealsService } from './meals.service';
+import { MealType, RequestCategory } from './dto/update-meal.dto';
 
 describe('MealsService (Unit Tests)', () => {
   let service: MealsService;
@@ -55,7 +56,7 @@ describe('MealsService (Unit Tests)', () => {
 
   it('should submit meal request successfully', async () => {
     const result = await service.requestMealUpdate(
-      { type: 'LUNCH', category: 'OFF', count: 1 },
+      { type: MealType.LUNCH, category: RequestCategory.OFF, count: 1 },
       'user_1',
     );
 

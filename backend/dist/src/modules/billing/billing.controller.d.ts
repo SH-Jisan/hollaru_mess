@@ -15,7 +15,7 @@ export declare class BillingController {
     }>;
     getMonthSummary(user: {
         id: string;
-    }): Promise<{}>;
+    }): Promise<any>;
     closeMonthSession(user: {
         id: string;
     }): Promise<{

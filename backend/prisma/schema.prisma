@@ -126,3 +126,25 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 }
+
+
+enum MetricPeriod {
+  MONTHLY
+  HALFYEARLY
+  ANNUAL
+}
+
+model SystemMetricSummary {
+  id               String       @id @default(uuid())
+  period           MetricPeriod
+  periodKey        String       // উদাহরণ: "2026-07", "2026-H1", "2026"
+  routePath        String
+  httpMethod       String
+  totalRequests    Int
+  averageLatencyMs Float
+  averageRamMb     Float
+  averageCpuMs     Float
+  createdAt        DateTime     @default(now())
+
+  @@index([periodKey])
+}
