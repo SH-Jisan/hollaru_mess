@@ -1,4 +1,5 @@
 import type { Cache } from 'cache-manager';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { CompletePurchaseDto } from './dto/complete-purchase.dto';
@@ -8,7 +9,8 @@ export declare class BazaarService {
     private prisma;
     private validator;
     private cacheManager;
-    constructor(prisma: PrismaService, validator: ContextValidatorService, cacheManager: Cache);
+    private notificationQueue;
+    constructor(prisma: PrismaService, validator: ContextValidatorService, cacheManager: Cache, notificationQueue: Queue);
     createBazaarItem(dto: CreateBazaarItemDto, userId: string): Promise<{
         id: string;
         createdAt: Date;

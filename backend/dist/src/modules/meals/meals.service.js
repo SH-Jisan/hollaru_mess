@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MealsService = void 0;
 const common_1 = require("@nestjs/common");
 const cache_manager_1 = require("@nestjs/cache-manager");
+const bullmq_1 = require("@nestjs/bullmq");
+const bullmq_2 = require("bullmq");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
 const context_validator_service_1 = require("../../common/services/context-validator.service");
@@ -22,10 +24,12 @@ let MealsService = class MealsService {
     prisma;
     validator;
     cacheManager;
-    constructor(prisma, validator, cacheManager) {
+    notificationQueue;
+    constructor(prisma, validator, cacheManager, notificationQueue) {
         this.prisma = prisma;
         this.validator = validator;
         this.cacheManager = cacheManager;
+        this.notificationQueue = notificationQueue;
     }
     async requestMealUpdate(dto, userId) {
         const { mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
@@ -45,7 +49,7 @@ let MealsService = class MealsService {
     }
     async approveRequest(requestId, managerId) {
         const { manager } = await this.validator.validateManager(managerId);
-        const result = await this.prisma.$transaction(async (tx) => {
+        const { result, targetUserId, mealType, mealCategory } = await this.prisma.$transaction(async (tx) => {
             const request = await tx.mealRequest.findUniqueOrThrow({
                 where: { id: requestId },
                 include: { log: true, user: true },
@@ -70,11 +74,21 @@ let MealsService = class MealsService {
                     },
                 },
             });
-            return { message: 'Request approved successfully' };
+            return {
+                result: { message: 'Request approved successfully' },
+                targetUserId: request.userId,
+                mealType: request.type,
+                mealCategory: request.category,
+            };
         });
         const todayStr = new Date().toISOString().split('T')[0];
         const cacheKey = `meals:${manager.messId}:${todayStr}:live`;
         await this.cacheManager.del(cacheKey);
+        await this.notificationQueue.add('send-user-notification', {
+            userId: targetUserId,
+            title: '🍲 Meal Request Approved!',
+            body: `Manager approved your ${mealCategory} request for ${mealType}.`,
+        });
         return result;
     }
     async getDailyLiveCount(userId) {
@@ -132,7 +146,8 @@ exports.MealsService = MealsService;
 exports.MealsService = MealsService = __decorate([
     (0, common_1.Injectable)(),
     __param(2, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __param(3, (0, bullmq_1.InjectQueue)('notification-queue')),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        context_validator_service_1.ContextValidatorService, Object])
+        context_validator_service_1.ContextValidatorService, Object, bullmq_2.Queue])
 ], MealsService);
 //# sourceMappingURL=meals.service.js.map

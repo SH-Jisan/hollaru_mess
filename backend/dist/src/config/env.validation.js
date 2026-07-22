@@ -26,6 +26,10 @@ class EnvironmentVariables {
     JWT_ACCESS_EXPIRATION;
     JWT_REFRESH_SECRET;
     JWT_REFRESH_EXPIRATION;
+    REDIS_HOST;
+    REDIS_PORT;
+    REDIS_PASSWORD;
+    REDIS_TLS;
 }
 __decorate([
     (0, class_validator_1.IsEnum)(Environment),
@@ -60,6 +64,26 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], EnvironmentVariables.prototype, "JWT_REFRESH_EXPIRATION", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], EnvironmentVariables.prototype, "REDIS_HOST", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], EnvironmentVariables.prototype, "REDIS_PORT", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], EnvironmentVariables.prototype, "REDIS_PASSWORD", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], EnvironmentVariables.prototype, "REDIS_TLS", void 0);
 function validate(config) {
     const validatedConfig = (0, class_transformer_1.plainToInstance)(EnvironmentVariables, config, { enableImplicitConversion: true });
     const errors = (0, class_validator_1.validateSync)(validatedConfig, { skipMissingProperties: false });

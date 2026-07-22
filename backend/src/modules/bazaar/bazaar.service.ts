@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Cache } from 'cache-manager';
+import type { Cache } from 'cache-manager';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';

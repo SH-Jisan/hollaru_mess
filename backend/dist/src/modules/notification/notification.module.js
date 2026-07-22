@@ -8,17 +8,24 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationModule = void 0;
 const common_1 = require("@nestjs/common");
+const bullmq_1 = require("@nestjs/bullmq");
 const notification_controller_1 = require("./notification.controller");
 const notification_service_1 = require("./notification.service");
+const notification_processor_1 = require("./notification.processor");
 let NotificationModule = class NotificationModule {
 };
 exports.NotificationModule = NotificationModule;
 exports.NotificationModule = NotificationModule = __decorate([
     (0, common_1.Global)(),
     (0, common_1.Module)({
+        imports: [
+            bullmq_1.BullModule.registerQueue({
+                name: 'notification-queue',
+            }),
+        ],
         controllers: [notification_controller_1.NotificationController],
-        providers: [notification_service_1.NotificationService],
-        exports: [notification_service_1.NotificationService],
+        providers: [notification_service_1.NotificationService, notification_processor_1.NotificationProcessor],
+        exports: [notification_service_1.NotificationService, bullmq_1.BullModule],
     })
 ], NotificationModule);
 //# sourceMappingURL=notification.module.js.map

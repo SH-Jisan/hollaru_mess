@@ -11,6 +11,10 @@ declare class EnvironmentVariables {
     JWT_ACCESS_EXPIRATION: string;
     JWT_REFRESH_SECRET: string;
     JWT_REFRESH_EXPIRATION: string;
+    REDIS_HOST?: string;
+    REDIS_PORT?: number;
+    REDIS_PASSWORD?: string;
+    REDIS_TLS?: string;
 }
 export declare function validate(config: Record<string, any>): EnvironmentVariables;
 export {};

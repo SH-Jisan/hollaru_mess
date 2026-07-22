@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Cache } from 'cache-manager';
+import type { Cache } from 'cache-manager';
 import { Queue } from 'bullmq';
 import { RequestStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';

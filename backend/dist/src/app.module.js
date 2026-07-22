@@ -10,6 +10,8 @@ exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const cache_manager_1 = require("@nestjs/cache-manager");
+const bullmq_1 = require("@nestjs/bullmq");
+const nestjs_prometheus_1 = require("@willsoto/nestjs-prometheus");
 const app_controller_1 = require("./app.controller");
 const app_service_1 = require("./app.service");
 const prisma_module_1 = require("./common/prisma/prisma.module");
@@ -35,13 +37,32 @@ exports.AppModule = AppModule = __decorate([
                 ttl: 300000,
                 max: 500,
             }),
+            nestjs_prometheus_1.PrometheusModule.register({
+                defaultMetrics: {
+                    enabled: true,
+                },
+                path: '/metrics',
+            }),
+            bullmq_1.BullModule.forRootAsync({
+                imports: [config_1.ConfigModule],
+                useFactory: async (configService) => ({
+                    connection: {
+                        host: configService.get('REDIS_HOST'),
+                        port: configService.get('REDIS_PORT', 6379),
+                        password: configService.get('REDIS_PASSWORD'),
+                        tls: configService.get('REDIS_TLS') === 'true' ? {} : undefined,
+                        maxRetriesPerRequest: null,
+                    },
+                }),
+                inject: [config_1.ConfigService],
+            }),
             prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
             mess_module_1.MessModule,
             meals_module_1.MealsModule,
             bazaar_module_1.BazaarModule,
             billing_module_1.BillingModule,
-            notification_module_1.NotificationModule
+            notification_module_1.NotificationModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],
