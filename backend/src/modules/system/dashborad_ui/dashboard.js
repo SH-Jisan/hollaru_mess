@@ -140,7 +140,7 @@ function renderAccordionList(metrics) {
           </div>
           <div class="accordion-right">
             <span style="font-size:12px; color:var(--text-muted);">Calls: <strong style="color:#fff;" id="calls-${safeKey}">${m.totalRequests}</strong></span>
-            <span class="latency-tag ${latClass}" id="latTag-${safeKey}">⚡ ${m.averageLatencyMs} ms</span>
+            <span class="latency-tag ${latClass}" id="latTag-${safeKey}">⚡ Avg: ${m.averageLatencyMs} ms</span>
             <span class="chevron">▼</span>
           </div>
         </div>
@@ -150,6 +150,10 @@ function renderAccordionList(metrics) {
             <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
               <div style="font-size:11px; color:var(--text-muted);">Success / Error</div>
               <div style="font-size:14px; font-weight:700; color:#34d399; margin-top:2px;" id="succ-${safeKey}">✅ ${m.successfulRequests} / <span style="color:#f87171;">❌ ${m.failedRequests}</span></div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
+              <div style="font-size:11px; color:var(--text-muted);">Last Response Time</div>
+              <div style="font-size:14px; font-weight:700; color:#38bdf8; margin-top:2px;" id="lastLat-${safeKey}">⏱️ ${m.lastLatencyMs || 0} ms</div>
             </div>
             <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
               <div style="font-size:11px; color:var(--text-muted);">Avg Latency</div>
@@ -165,32 +169,31 @@ function renderAccordionList(metrics) {
             </div>
             <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--border);">
               <div style="font-size:11px; color:var(--text-muted);">Last Hit Time</div>
-              <div style="font-size:12px; font-weight:600; color:#fff; margin-top:4px;" id="lastTime-${safeKey}">${new Date(m.lastRequestedAt).toLocaleTimeString()}</div>
+              <div style="font-size:12px; font-weight:600; color:#fff; margin-top:4px;" id="lastTime-${safeKey}">${m.lastRequestedAt ? new Date(m.lastRequestedAt).toLocaleTimeString() : '--'}</div>
             </div>
           </div>
 
 
-          <div style="font-size:12px; font-weight:600; margin-bottom:8px; color:var(--text-muted);">📈 Real-Time Response Latency Trend (ms):</div>
+          <div style="font-size:12px; font-weight:600; margin-bottom:8px; color:var(--text-muted);">📈 Real-Time Average Latency Trend (ms):</div>
           <div style="height:140px; width:100%;">
             <canvas id="chart-${safeKey}"></canvas>
           </div>
         </div>
       `;
       container.appendChild(itemEl);
-
-      container.appendChild(itemEl);
     } else {
       // 🟢 Smoothly update existing numbers without destroying canvas
       document.getElementById(`calls-${safeKey}`).innerText = m.totalRequests;
       document.getElementById(`succ-${safeKey}`).innerHTML = `✅ ${m.successfulRequests} / <span style="color:#f87171;">❌ ${m.failedRequests}</span>`;
+      if (document.getElementById(`lastLat-${safeKey}`)) document.getElementById(`lastLat-${safeKey}`).innerText = `⏱️ ${m.lastLatencyMs || 0} ms`;
       document.getElementById(`avgLat-${safeKey}`).innerText = `⚡ ${m.averageLatencyMs} ms`;
       if (document.getElementById(`ram-${safeKey}`)) document.getElementById(`ram-${safeKey}`).innerText = `🧠 ${m.averageRamMb || '0.05'} MB`;
       if (document.getElementById(`cpu-${safeKey}`)) document.getElementById(`cpu-${safeKey}`).innerText = `⚙️ ${m.averageCpuMs || '0.20'} ms`;
-      document.getElementById(`lastTime-${safeKey}`).innerText = new Date(m.lastRequestedAt).toLocaleTimeString();
+      document.getElementById(`lastTime-${safeKey}`).innerText = m.lastRequestedAt ? new Date(m.lastRequestedAt).toLocaleTimeString() : '--';
       
       const tag = document.getElementById(`latTag-${safeKey}`);
       tag.className = `latency-tag ${latClass}`;
-      tag.innerText = `⚡ ${m.averageLatencyMs} ms`;
+      tag.innerText = `⚡ Avg: ${m.averageLatencyMs} ms`;
     }
   });
 }
@@ -220,7 +223,7 @@ function initRouteChart(key, safeKey) {
       labels: history.map(h => h.time),
       datasets: [
         {
-          label: 'Latency (ms)',
+          label: 'Avg Latency (ms)',
           data: history.map(h => h.latency),
           borderColor: '#818cf8',
           backgroundColor: 'rgba(129, 140, 248, 0.15)',

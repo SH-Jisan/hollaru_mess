@@ -9,6 +9,7 @@ export interface RouteMetric {
     failedRequests: number;
     totalLatencyMs: number;
     averageLatencyMs: number;
+    lastLatencyMs: number;
     totalRamMb: number;
     averageRamMb: number;
     totalCpuMs: number;

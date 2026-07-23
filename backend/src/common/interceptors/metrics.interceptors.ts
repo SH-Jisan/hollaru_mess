@@ -18,6 +18,7 @@ export interface RouteMetric {
   failedRequests: number;
   totalLatencyMs: number;
   averageLatencyMs: number;
+  lastLatencyMs: number;
   totalRamMb: number;
   averageRamMb: number;
   totalCpuMs: number;
@@ -63,6 +64,7 @@ export class MetricsInterceptor implements NestInterceptor {
           failedRequests: 0,
           totalLatencyMs: 0,
           averageLatencyMs: 0,
+          lastLatencyMs: 0,
           totalRamMb: 0,
           averageRamMb: 0,
           totalCpuMs: 0,
@@ -74,6 +76,7 @@ export class MetricsInterceptor implements NestInterceptor {
         if (isSuccess) existing.successfulRequests += 1;
         else existing.failedRequests += 1;
 
+        existing.lastLatencyMs = duration;
         existing.totalLatencyMs += duration;
         existing.averageLatencyMs = Number((existing.totalLatencyMs / existing.totalRequests).toFixed(2));
 
@@ -111,6 +114,7 @@ export class MetricsInterceptor implements NestInterceptor {
           failedRequests: 0,
           totalLatencyMs: 0,
           averageLatencyMs: 0,
+          lastLatencyMs: 0,
           totalRamMb: 0,
           averageRamMb: 0,
           totalCpuMs: 0,
