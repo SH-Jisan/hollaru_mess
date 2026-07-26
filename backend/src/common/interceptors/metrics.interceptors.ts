@@ -29,6 +29,7 @@ export interface RouteMetric {
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
   private static metricsMap = new Map<string, RouteMetric>();
+  private static lastRedisSyncMap = new Map<string, number>();
   private static readonly MAX_MAP_SIZE = 500;
 
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
@@ -91,10 +92,17 @@ export class MetricsInterceptor implements NestInterceptor {
 
         // ⚡ ২. Upstash Redis-এ ৩০ দিনের TTL (2592000 seconds) দিয়ে সেভ করা
         try {
-          const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
+          const now = Date.now();
+          const lastSync = MetricsInterceptor.lastRedisSyncMap.get(metricKey) || 0;
+          if (now - lastSync > 10000){
+            MetricsInterceptor.lastRedisSyncMap.set(metricKey, now);
+            const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
           const redisKey = `metrics:monthly:${currentMonth}:${metricKey}`;
           const ttlSeconds = 30 * 24 * 60 * 60; // 30 Days Auto Expiration
           await this.cacheManager.set(redisKey, existing, ttlSeconds);
+
+          }
+          
         } catch (err) {
           // Redis Exception Handling
         }

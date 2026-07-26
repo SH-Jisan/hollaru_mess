@@ -95,14 +95,24 @@ let AuthService = class AuthService {
     }
     async login(dto) {
         const cacheKey = `auth:user:${dto.email}`;
-        let user = await this.cacheManager.get(cacheKey);
+        let user = null;
+        try {
+            user = await this.cacheManager.get(cacheKey);
+        }
+        catch (err) {
+            user = null;
+        }
         if (!user) {
             user = await this.prisma.user.findUnique({
                 where: { email: dto.email },
             });
             if (user) {
-                const { hashedRefreshToken, ...safeCachePayload } = user;
-                await this.cacheManager.set(cacheKey, safeCachePayload, 900000);
+                try {
+                    const { hashedRefreshToken, ...safeCachePayload } = user;
+                    await this.cacheManager.set(cacheKey, safeCachePayload, 900000);
+                }
+                catch (err) {
+                }
             }
         }
         if (!user) {
@@ -118,7 +128,11 @@ let AuthService = class AuthService {
         return { user: userWithoutSecrets, ...tokens };
     }
     async clearUserAuthCache(email) {
-        await this.cacheManager.del(`auth:user:${email}`);
+        try {
+            await this.cacheManager.del(`auth:user:${email}`);
+        }
+        catch (err) {
+        }
     }
     async refresh(dto) {
         try {

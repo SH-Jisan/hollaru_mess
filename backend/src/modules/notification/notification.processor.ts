@@ -3,7 +3,10 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { NotificationService } from './notification.service';
 
-@Processor('notification-queue')
+@Processor('notification-queue',{
+  drainDelay: 30,
+  stalledInterval: 30000,
+})
 export class NotificationProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationProcessor.name);
 

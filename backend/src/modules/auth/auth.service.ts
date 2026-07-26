@@ -61,7 +61,12 @@ export class AuthService {
     const cacheKey = `auth:user:${dto.email}`;
 
     // ⚡ 1. Ultra-fast 1ms Redis User Auth Check (Skips 60ms PostgreSQL network trip!)
-    let user: any = await this.cacheManager.get(cacheKey);
+    let user: any = null;
+    try{
+      user = await this.cacheManager.get(cacheKey);
+    } catch(err){
+      user = null;
+    }
 
     if (!user) {
       // 🗄️ 2. Fallback to Supabase Database if not in Redis
@@ -70,9 +75,13 @@ export class AuthService {
       });
 
       if (user) {
+        try{
         // 🔒 FIX DRAWBACK 2: Exclude hashedRefreshToken and set 15-min TTL (900000ms) for high security
         const { hashedRefreshToken, ...safeCachePayload } = user;
         await this.cacheManager.set(cacheKey, safeCachePayload, 900000);
+        } catch (err){
+          // ignore error
+        }
       }
     }
 
@@ -96,7 +105,11 @@ export class AuthService {
 
   // 🔒 FIX DRAWBACK 1: Helper method to invalidate stale user cache when profile/password is updated
   async clearUserAuthCache(email: string) {
+    try{
     await this.cacheManager.del(`auth:user:${email}`);
+    } catch (err){
+      // ignore error
+    }
   }
 
 

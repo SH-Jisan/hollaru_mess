@@ -36,15 +36,48 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('REDIS_HOST'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-          password: configService.get<string>('REDIS_PASSWORD'),
-          tls: configService.get<string>('REDIS_TLS') === 'true' ? {} : undefined,
-          maxRetriesPerRequest: null,
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        let host = configService.get<string>('REDIS_HOST_1') || configService.get<string>('REDIS_HOST');
+        let password = configService.get<string>('REDIS_PASSWORD_1') || configService.get<string>('REDIS_PASSWORD');
+        const secondaryHost = configService.get<string>('REDIS_HOST_2');
+        const secondaryPassword = configService.get<string>('REDIS_PASSWORD_2');
+
+        // ⚡ Startup Auto-Check: ১ মিলিসেকেন্ডে ১ম Redis সচল আছে কিনা চেক করা
+        if (host && secondaryHost) {
+          try {
+            const Redis = (await import('ioredis')).default;
+            const pingClient = new Redis({
+              host,
+              port: configService.get<number>('REDIS_PORT_1', 6379),
+              password,
+              tls: (configService.get<string>('REDIS_TLS_1') || configService.get<string>('REDIS_TLS')) === 'true' ? {} : undefined,
+              connectTimeout: 2000,
+              maxRetriesPerRequest: 1,
+            });
+            await pingClient.ping();
+            await pingClient.quit();
+          } catch (err) {
+            console.warn(`⚠️ Primary Redis (${host}) limit reached or offline! Switched to Secondary Backup Redis (${secondaryHost}).`);
+            host = secondaryHost;
+            password = secondaryPassword;
+          }
+        }
+
+        return {
+          connection: {
+            host,
+            port: 6379,
+            password,
+            tls: {},
+            maxRetriesPerRequest: null,
+            enableOfflineQueue: false,
+          },
+          defaultJobOptions: {
+            removeOnComplete: true,
+            removeOnFail: 100,
+          },
+        };
+      },
       inject: [ConfigService],
     }),
     PrismaModule,

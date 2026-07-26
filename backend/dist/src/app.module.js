@@ -48,15 +48,46 @@ exports.AppModule = AppModule = __decorate([
             }),
             bullmq_1.BullModule.forRootAsync({
                 imports: [config_1.ConfigModule],
-                useFactory: async (configService) => ({
-                    connection: {
-                        host: configService.get('REDIS_HOST'),
-                        port: configService.get('REDIS_PORT', 6379),
-                        password: configService.get('REDIS_PASSWORD'),
-                        tls: configService.get('REDIS_TLS') === 'true' ? {} : undefined,
-                        maxRetriesPerRequest: null,
-                    },
-                }),
+                useFactory: async (configService) => {
+                    let host = configService.get('REDIS_HOST_1') || configService.get('REDIS_HOST');
+                    let password = configService.get('REDIS_PASSWORD_1') || configService.get('REDIS_PASSWORD');
+                    const secondaryHost = configService.get('REDIS_HOST_2');
+                    const secondaryPassword = configService.get('REDIS_PASSWORD_2');
+                    if (host && secondaryHost) {
+                        try {
+                            const Redis = (await import('ioredis')).default;
+                            const pingClient = new Redis({
+                                host,
+                                port: configService.get('REDIS_PORT_1', 6379),
+                                password,
+                                tls: (configService.get('REDIS_TLS_1') || configService.get('REDIS_TLS')) === 'true' ? {} : undefined,
+                                connectTimeout: 2000,
+                                maxRetriesPerRequest: 1,
+                            });
+                            await pingClient.ping();
+                            await pingClient.quit();
+                        }
+                        catch (err) {
+                            console.warn(`⚠️ Primary Redis (${host}) limit reached or offline! Switched to Secondary Backup Redis (${secondaryHost}).`);
+                            host = secondaryHost;
+                            password = secondaryPassword;
+                        }
+                    }
+                    return {
+                        connection: {
+                            host,
+                            port: 6379,
+                            password,
+                            tls: {},
+                            maxRetriesPerRequest: null,
+                            enableOfflineQueue: false,
+                        },
+                        defaultJobOptions: {
+                            removeOnComplete: true,
+                            removeOnFail: 100,
+                        },
+                    };
+                },
                 inject: [config_1.ConfigService],
             }),
             prisma_module_1.PrismaModule,

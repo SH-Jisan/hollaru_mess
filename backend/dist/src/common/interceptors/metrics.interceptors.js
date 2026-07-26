@@ -21,6 +21,7 @@ let MetricsInterceptor = class MetricsInterceptor {
     static { MetricsInterceptor_1 = this; }
     cacheManager;
     static metricsMap = new Map();
+    static lastRedisSyncMap = new Map();
     static MAX_MAP_SIZE = 500;
     constructor(cacheManager) {
         this.cacheManager = cacheManager;
@@ -72,10 +73,15 @@ let MetricsInterceptor = class MetricsInterceptor {
             existing.lastRequestedAt = new Date().toISOString();
             MetricsInterceptor_1.metricsMap.set(metricKey, existing);
             try {
-                const currentMonth = new Date().toISOString().slice(0, 7);
-                const redisKey = `metrics:monthly:${currentMonth}:${metricKey}`;
-                const ttlSeconds = 30 * 24 * 60 * 60;
-                await this.cacheManager.set(redisKey, existing, ttlSeconds);
+                const now = Date.now();
+                const lastSync = MetricsInterceptor_1.lastRedisSyncMap.get(metricKey) || 0;
+                if (now - lastSync > 10000) {
+                    MetricsInterceptor_1.lastRedisSyncMap.set(metricKey, now);
+                    const currentMonth = new Date().toISOString().slice(0, 7);
+                    const redisKey = `metrics:monthly:${currentMonth}:${metricKey}`;
+                    const ttlSeconds = 30 * 24 * 60 * 60;
+                    await this.cacheManager.set(redisKey, existing, ttlSeconds);
+                }
             }
             catch (err) {
             }
