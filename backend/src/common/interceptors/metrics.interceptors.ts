@@ -94,9 +94,9 @@ export class MetricsInterceptor implements NestInterceptor {
         try {
           const now = Date.now();
           const lastSync = MetricsInterceptor.lastRedisSyncMap.get(metricKey) || 0;
-          if (now - lastSync > 10000){
-            MetricsInterceptor.lastRedisSyncMap.set(metricKey, now);
-            const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
+          if (now - lastSync > 60000){
+          MetricsInterceptor.lastRedisSyncMap.set(metricKey, now);
+          const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
           const redisKey = `metrics:monthly:${currentMonth}:${metricKey}`;
           const ttlSeconds = 30 * 24 * 60 * 60; // 30 Days Auto Expiration
           await this.cacheManager.set(redisKey, existing, ttlSeconds);

@@ -40,8 +40,8 @@ let NotificationProcessor = NotificationProcessor_1 = class NotificationProcesso
 exports.NotificationProcessor = NotificationProcessor;
 exports.NotificationProcessor = NotificationProcessor = NotificationProcessor_1 = __decorate([
     (0, bullmq_1.Processor)('notification-queue', {
-        drainDelay: 30,
-        stalledInterval: 30000,
+        drainDelay: 120,
+        stalledInterval: 60000,
     }),
     __metadata("design:paramtypes", [notification_service_1.NotificationService])
 ], NotificationProcessor);

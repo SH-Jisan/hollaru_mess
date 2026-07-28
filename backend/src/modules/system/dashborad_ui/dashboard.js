@@ -265,4 +265,4 @@ function filterRoutes() {
 
 initMemoryChart();
 fetchMetrics();
-setInterval(fetchMetrics, 3000);
+setInterval(fetchMetrics, 10000);

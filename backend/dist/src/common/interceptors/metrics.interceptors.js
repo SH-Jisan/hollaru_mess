@@ -75,7 +75,7 @@ let MetricsInterceptor = class MetricsInterceptor {
             try {
                 const now = Date.now();
                 const lastSync = MetricsInterceptor_1.lastRedisSyncMap.get(metricKey) || 0;
-                if (now - lastSync > 10000) {
+                if (now - lastSync > 60000) {
                     MetricsInterceptor_1.lastRedisSyncMap.set(metricKey, now);
                     const currentMonth = new Date().toISOString().slice(0, 7);
                     const redisKey = `metrics:monthly:${currentMonth}:${metricKey}`;
