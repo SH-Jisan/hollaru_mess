@@ -15,6 +15,13 @@ export declare class SystemService {
     getSystemMetrics(): Promise<{
         status: string;
         timestamp: string;
+        engine: {
+            nodeVersion: string;
+            pid: number;
+            platform: NodeJS.Platform;
+            env: string;
+        };
+        healthScore: number;
         uptime: {
             seconds: number;
             formatted: string;
@@ -23,6 +30,7 @@ export declare class SystemService {
             processRssMb: string;
             heapTotalMb: string;
             heapUsedMb: string;
+            heapPercent: number;
             systemTotalRamGb: string;
             systemFreeRamGb: string;
         };
@@ -34,12 +42,19 @@ export declare class SystemService {
         database: {
             status: string;
             latencyMs: string;
+            latencyValue: number;
         };
         queue: {
             waiting: number;
             active: number;
             completed: number;
             failed: number;
+        };
+        trafficSummary: {
+            totalRequests: number;
+            successfulRequests: number;
+            failedRequests: number;
+            successRatePercent: number;
         };
         apiMetrics: import("../../common/interceptors/metrics.interceptors").RouteMetric[];
     }>;

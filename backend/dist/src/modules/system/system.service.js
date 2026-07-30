@@ -150,6 +150,7 @@ let SystemService = SystemService_1 = class SystemService {
         const memoryUsage = process.memoryUsage();
         const systemTotalMemory = os.totalmem();
         const systemFreeMemory = os.freemem();
+        const heapPercent = Number(((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100).toFixed(1));
         const dbStartTime = Date.now();
         let dbStatus = 'HEALTHY';
         let dbLatencyMs = 0;
@@ -162,19 +163,38 @@ let SystemService = SystemService_1 = class SystemService {
         }
         let queueMetrics = { waiting: 0, active: 0, completed: 0, failed: 0 };
         try {
-            const [waiting, active, completed, failed] = await Promise.all([
-                this.notificationQueue.getWaitingCount(),
-                this.notificationQueue.getActiveCount(),
-                this.notificationQueue.getCompletedCount(),
-                this.notificationQueue.getFailedCount(),
-            ]);
-            queueMetrics = { waiting, active, completed, failed };
+            const counts = await this.notificationQueue.getJobCounts('waiting', 'active', 'completed', 'failed');
+            queueMetrics = {
+                waiting: counts.waiting || 0,
+                active: counts.active || 0,
+                completed: counts.completed || 0,
+                failed: counts.failed || 0,
+            };
         }
         catch (err) {
         }
+        let healthScore = 100;
+        if (dbStatus !== 'HEALTHY')
+            healthScore -= 40;
+        if (dbLatencyMs > 200)
+            healthScore -= 15;
+        if (heapPercent > 85)
+            healthScore -= 20;
+        const apiMetrics = metrics_interceptors_1.MetricsInterceptor.getMetricsList();
+        const totalSystemRequests = apiMetrics.reduce((sum, item) => sum + item.totalRequests, 0);
+        const totalSuccessfulRequests = apiMetrics.reduce((sum, item) => sum + item.successfulRequests, 0);
+        const totalFailedRequests = apiMetrics.reduce((sum, item) => sum + item.failedRequests, 0);
+        const successRate = totalSystemRequests > 0 ? Number(((totalSuccessfulRequests / totalSystemRequests) * 100).toFixed(1)) : 100;
         return {
             status: 'OK',
             timestamp: new Date().toISOString(),
+            engine: {
+                nodeVersion: process.version,
+                pid: process.pid,
+                platform: os.platform(),
+                env: process.env.NODE_ENV || 'development',
+            },
+            healthScore: Math.max(0, healthScore),
             uptime: {
                 seconds: Math.floor(process.uptime()),
                 formatted: this.formatUptime(process.uptime()),
@@ -183,6 +203,7 @@ let SystemService = SystemService_1 = class SystemService {
                 processRssMb: (memoryUsage.rss / 1024 / 1024).toFixed(2),
                 heapTotalMb: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2),
                 heapUsedMb: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2),
+                heapPercent,
                 systemTotalRamGb: (systemTotalMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
                 systemFreeRamGb: (systemFreeMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
             },
@@ -194,9 +215,16 @@ let SystemService = SystemService_1 = class SystemService {
             database: {
                 status: dbStatus,
                 latencyMs: `${dbLatencyMs} ms`,
+                latencyValue: dbLatencyMs,
             },
             queue: queueMetrics,
-            apiMetrics: metrics_interceptors_1.MetricsInterceptor.getMetricsList(),
+            trafficSummary: {
+                totalRequests: totalSystemRequests,
+                successfulRequests: totalSuccessfulRequests,
+                failedRequests: totalFailedRequests,
+                successRatePercent: successRate,
+            },
+            apiMetrics,
         };
     }
     scanAndRegisterRoutes() {

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import { Observable } from 'rxjs';
+import { Observable, ReplaySubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
 
 export interface RouteMetric {
@@ -30,6 +30,7 @@ export interface RouteMetric {
 export class MetricsInterceptor implements NestInterceptor {
   private static metricsMap = new Map<string, RouteMetric>();
   private static lastRedisSyncMap = new Map<string, number>();
+  private static metricsSubject = new ReplaySubject<RouteMetric[]>(1);
   private static readonly MAX_MAP_SIZE = 500;
 
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
@@ -90,6 +91,11 @@ export class MetricsInterceptor implements NestInterceptor {
 
         MetricsInterceptor.metricsMap.set(metricKey, existing);
 
+        // ⚡ 1. Real-time Instant SSE Stream Event Fire (Exclude internal system routes from event recursion)
+        if (!path.startsWith('/system')) {
+          MetricsInterceptor.metricsSubject.next(MetricsInterceptor.getMetricsList());
+        }
+
         // ⚡ ২. Upstash Redis-এ ৩০ দিনের TTL (2592000 seconds) দিয়ে সেভ করা
         try {
           const now = Date.now();
@@ -135,5 +141,9 @@ export class MetricsInterceptor implements NestInterceptor {
 
   static getMetricsList(): RouteMetric[] {
     return Array.from(MetricsInterceptor.metricsMap.values());
+  }
+
+  static getMetricsObservable(): Observable<RouteMetric[]>{
+    return MetricsInterceptor.metricsSubject.asObservable();
   }
 }

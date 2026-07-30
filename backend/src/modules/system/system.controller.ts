@@ -1,8 +1,11 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Header, MessageEvent, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SystemService } from './system.service';
+import { MetricsInterceptor } from '../../common/interceptors/metrics.interceptors';
 
 @ApiTags('System & Health Status')
 @Controller('system')
@@ -23,6 +26,14 @@ export class SystemController {
     return this.readFile('dashboard.html');
   }
 
+   @Sse('events')
+  @ApiOperation({ summary: 'Stream live real-time metrics updates via Server-Sent Events (SSE)' })
+  streamMetrics(): Observable<MessageEvent> {
+    return MetricsInterceptor.getMetricsObservable().pipe(
+      map((data) => ({ data: JSON.stringify(data) } as MessageEvent)),
+    );
+  }
+  
   @Get('dashboard.css')
   @Header('Content-Type', 'text/css')
   getDashboardCss(): string {

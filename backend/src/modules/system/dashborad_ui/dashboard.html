@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Meal Book - Live Observability & Memory Leak Detector</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>Meal Book - Enterprise Observability Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/system/dashboard.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -12,40 +12,62 @@
   <div class="header">
     <div class="title-area">
       <div class="pulse-dot"></div>
-      <h1>Meal Book - Enterprise Observability Dashboard</h1>
-      <span class="badge" id="lastUpdated">Updating...</span>
+      <h1>Meal Book - Enterprise Observability Engine</h1>
+      <span class="badge badge-pulse" id="lastUpdated">🟢 Real-Time SSE Active</span>
     </div>
-    <div style="font-size: 12px; color: var(--text-muted);">Auto-Refresh: <strong style="color:var(--success);">3s</strong></div>
+    <div class="header-right">
+      <button class="btn-export" onclick="exportMetricsJson()">📥 Export JSON</button>
+      <div style="font-size: 12px; color: var(--text-muted);">Mode: <strong style="color:var(--success);">⚡ Real-Time SSE Stream (0ms)</strong></div>
+    </div>
   </div>
 
-  <!-- Cards Row 1: System & DB -->
+  <!-- Cards Row 1: System Health & Key Indicators -->
   <div class="grid-cards">
-    <div class="card">
-      <div class="card-title">Server Uptime</div>
-      <div class="card-value" id="uptimeVal">--</div>
-      <div class="card-sub" id="uptimeSec">0s running</div>
+    <div class="card card-neon-green">
+      <div class="card-title">Global System Health</div>
+      <div class="card-value" id="healthScoreVal">100%</div>
+      <div class="card-sub" id="healthScoreStatus">Status: EXCELLENT</div>
     </div>
-    <div class="card">
+
+    <div class="card card-neon-purple">
+      <div class="card-title">Total System Throughput</div>
+      <div class="card-value" id="totalTrafficVal">0 Hits</div>
+      <div class="card-sub" id="successRateVal">Success Rate: 100%</div>
+    </div>
+
+    <div class="card card-neon-blue">
       <div class="card-title">Heap Memory Used</div>
       <div class="card-value" id="heapVal">-- MB</div>
       <div class="card-sub" id="rssVal">RSS: -- MB</div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" id="heapProgressBar" style="width: 0%;"></div></div>
     </div>
-    <div class="card">
-      <div class="card-title">Database Latency</div>
+
+    <div class="card card-neon-amber">
+      <div class="card-title">Database Response (Ping)</div>
       <div class="card-value" id="dbLatencyVal">-- ms</div>
-      <div class="card-sub" id="dbStatusVal">Status: --</div>
+      <div class="card-sub" id="dbStatusVal">Status: HEALTHY</div>
     </div>
-    <div class="card">
-      <div class="card-title">BullMQ Queue Status</div>
+
+    <div class="card card-neon-cyan">
+      <div class="card-title">BullMQ Queue Engine</div>
       <div class="card-value" id="queueActiveVal">0 Active</div>
       <div class="card-sub" id="queueSubVal">Waiting: 0 | Failed: 0</div>
     </div>
   </div>
 
+  <!-- Node.js Engine & Server Specs Ribbon -->
+  <div class="specs-ribbon" id="engineSpecsRibbon">
+    <div class="spec-item">⚙️ Engine: <strong id="nodeVer">Node.js --</strong></div>
+    <div class="spec-item">🖥️ Platform: <strong id="platformVer">--</strong></div>
+    <div class="spec-item">💻 CPU Cores: <strong id="cpuCores">-- Cores</strong></div>
+    <div class="spec-item">🕒 Uptime: <strong id="uptimeVal">--</strong></div>
+    <div class="spec-item">🔒 Env: <strong id="envVal">development</strong></div>
+  </div>
+
   <!-- Live Memory Trend Chart -->
   <div class="chart-container">
     <div class="chart-header">
-      <div style="font-size: 15px; font-weight: 600;">📈 Live Memory Trend & Memory Leak Detector</div>
+      <div style="font-size: 15px; font-weight: 600;">📈 Live Heap & RSS Memory Leak Detector</div>
       <span class="badge" id="memLeakStatus" style="background:rgba(16,185,129,0.15); color:#34d399; border-color:rgba(16,185,129,0.3);">🟢 Memory Status: Normal</span>
     </div>
     <div style="height: 180px; width: 100%;">
@@ -53,15 +75,36 @@
     </div>
   </div>
 
-  <!-- Swagger Style API Metrics Engine Header -->
-  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
-    <div style="font-size: 16px; font-weight: 600;">⚡ Per-Route API Metrics Engine (Swagger Accordion View)</div>
-    <input type="text" id="searchInput" class="search-box" placeholder="Filter API Route..." onkeyup="filterRoutes()">
+  <!-- Swagger Style API Metrics Engine Header & Controls -->
+  <div class="controls-bar">
+    <div style="font-size: 16px; font-weight: 700; color: #fff;">⚡ Per-Route API Metrics Engine (Swagger Accordion View)</div>
+
+    <div class="filter-controls">
+      <!-- Method Filter Pills -->
+      <div class="method-pills">
+        <button class="pill active" onclick="filterByMethod('ALL', this)">ALL</button>
+        <button class="pill pill-GET" onclick="filterByMethod('GET', this)">GET</button>
+        <button class="pill pill-POST" onclick="filterByMethod('POST', this)">POST</button>
+        <button class="pill pill-PATCH" onclick="filterByMethod('PATCH', this)">PATCH</button>
+        <button class="pill pill-DELETE" onclick="filterByMethod('DELETE', this)">DELETE</button>
+      </div>
+
+      <!-- Sort Controls -->
+      <select id="sortSelect" class="select-box" onchange="applySorting()">
+        <option value="calls">Sort by: Total Calls (High → Low)</option>
+        <option value="latency">Sort by: Avg Latency (Slow → Fast)</option>
+        <option value="errors">Sort by: Failed Errors</option>
+        <option value="recent">Sort by: Recently Hit</option>
+      </select>
+
+      <!-- Search Input -->
+      <input type="text" id="searchInput" class="search-box" placeholder="Search API Route..." onkeyup="filterRoutes()">
+    </div>
   </div>
 
   <!-- Swagger Accordion List Container -->
   <div id="accordionContainer">
-    <div style="text-align:center; padding:30px; color:var(--text-muted);">Loading API endpoints...</div>
+    <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading API endpoints...</div>
   </div>
 
   <script src="/system/dashboard.js"></script>

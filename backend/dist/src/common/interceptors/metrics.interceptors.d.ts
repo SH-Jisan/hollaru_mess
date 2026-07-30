@@ -20,6 +20,7 @@ export declare class MetricsInterceptor implements NestInterceptor {
     private cacheManager;
     private static metricsMap;
     private static lastRedisSyncMap;
+    private static metricsSubject;
     private static readonly MAX_MAP_SIZE;
     constructor(cacheManager: Cache);
     intercept(context: ExecutionContext, next: CallHandler): Observable<any>;
@@ -28,4 +29,5 @@ export declare class MetricsInterceptor implements NestInterceptor {
         path: string;
     }>): void;
     static getMetricsList(): RouteMetric[];
+    static getMetricsObservable(): Observable<RouteMetric[]>;
 }

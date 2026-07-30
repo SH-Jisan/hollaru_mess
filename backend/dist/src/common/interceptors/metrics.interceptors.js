@@ -16,12 +16,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MetricsInterceptor = void 0;
 const common_1 = require("@nestjs/common");
 const cache_manager_1 = require("@nestjs/cache-manager");
+const rxjs_1 = require("rxjs");
 const operators_1 = require("rxjs/operators");
 let MetricsInterceptor = class MetricsInterceptor {
     static { MetricsInterceptor_1 = this; }
     cacheManager;
     static metricsMap = new Map();
     static lastRedisSyncMap = new Map();
+    static metricsSubject = new rxjs_1.ReplaySubject(1);
     static MAX_MAP_SIZE = 500;
     constructor(cacheManager) {
         this.cacheManager = cacheManager;
@@ -72,6 +74,9 @@ let MetricsInterceptor = class MetricsInterceptor {
             existing.averageCpuMs = Number((existing.totalCpuMs / existing.totalRequests).toFixed(2));
             existing.lastRequestedAt = new Date().toISOString();
             MetricsInterceptor_1.metricsMap.set(metricKey, existing);
+            if (!path.startsWith('/system')) {
+                MetricsInterceptor_1.metricsSubject.next(MetricsInterceptor_1.getMetricsList());
+            }
             try {
                 const now = Date.now();
                 const lastSync = MetricsInterceptor_1.lastRedisSyncMap.get(metricKey) || 0;
@@ -111,6 +116,9 @@ let MetricsInterceptor = class MetricsInterceptor {
     }
     static getMetricsList() {
         return Array.from(MetricsInterceptor_1.metricsMap.values());
+    }
+    static getMetricsObservable() {
+        return MetricsInterceptor_1.metricsSubject.asObservable();
     }
 };
 exports.MetricsInterceptor = MetricsInterceptor;

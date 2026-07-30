@@ -45,9 +45,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SystemController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
+const rxjs_1 = require("rxjs");
+const operators_1 = require("rxjs/operators");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const system_service_1 = require("./system.service");
+const metrics_interceptors_1 = require("../../common/interceptors/metrics.interceptors");
 let SystemController = class SystemController {
     systemService;
     constructor(systemService) {
@@ -58,6 +61,9 @@ let SystemController = class SystemController {
     }
     getDashboardUi() {
         return this.readFile('dashboard.html');
+    }
+    streamMetrics() {
+        return metrics_interceptors_1.MetricsInterceptor.getMetricsObservable().pipe((0, operators_1.map)((data) => ({ data: JSON.stringify(data) })));
     }
     getDashboardCss() {
         return this.readFile('dashboard.css');
@@ -89,6 +95,13 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", String)
 ], SystemController.prototype, "getDashboardUi", null);
+__decorate([
+    (0, common_1.Sse)('events'),
+    (0, swagger_1.ApiOperation)({ summary: 'Stream live real-time metrics updates via Server-Sent Events (SSE)' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", rxjs_1.Observable)
+], SystemController.prototype, "streamMetrics", null);
 __decorate([
     (0, common_1.Get)('dashboard.css'),
     (0, common_1.Header)('Content-Type', 'text/css'),

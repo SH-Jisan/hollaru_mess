@@ -1,3 +1,5 @@
+import { MessageEvent } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { SystemService } from './system.service';
 export declare class SystemController {
     private readonly systemService;
@@ -5,6 +7,13 @@ export declare class SystemController {
     getSystemStatus(): Promise<{
         status: string;
         timestamp: string;
+        engine: {
+            nodeVersion: string;
+            pid: number;
+            platform: NodeJS.Platform;
+            env: string;
+        };
+        healthScore: number;
         uptime: {
             seconds: number;
             formatted: string;
@@ -13,6 +22,7 @@ export declare class SystemController {
             processRssMb: string;
             heapTotalMb: string;
             heapUsedMb: string;
+            heapPercent: number;
             systemTotalRamGb: string;
             systemFreeRamGb: string;
         };
@@ -24,6 +34,7 @@ export declare class SystemController {
         database: {
             status: string;
             latencyMs: string;
+            latencyValue: number;
         };
         queue: {
             waiting: number;
@@ -31,9 +42,16 @@ export declare class SystemController {
             completed: number;
             failed: number;
         };
+        trafficSummary: {
+            totalRequests: number;
+            successfulRequests: number;
+            failedRequests: number;
+            successRatePercent: number;
+        };
         apiMetrics: import("../../common/interceptors/metrics.interceptors").RouteMetric[];
     }>;
     getDashboardUi(): string;
+    streamMetrics(): Observable<MessageEvent>;
     getDashboardCss(): string;
     getDashboardJs(): string;
     private readFile;
