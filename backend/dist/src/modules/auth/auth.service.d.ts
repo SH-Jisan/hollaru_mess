@@ -35,7 +35,10 @@ export declare class AuthService {
     private generateTokens;
     private hashToken;
     private updateRefreshToken;
-    logout(userId: string, email: string): Promise<{
+    logout(userId: string, email: string, accessToken?: string): Promise<{
+        message: string;
+    }>;
+    logoutAllDevices(userId: string, email: string, accessToken?: string): Promise<{
         message: string;
     }>;
 }

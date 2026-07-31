@@ -184,8 +184,9 @@ export class AuthService {
   }
 
     
-  async logout(userId: string, email: string) {
-    // ⚡ ১. Supabase PostgreSQL-এ Refresh Token মুছে দেওয়া
+    // 🔒 ৪.১ মেম্বার লগআউট (Access Token Blacklisting সহ)
+  async logout(userId: string, email: string, accessToken?: string) {
+    // ⚡ ১. Supabase-এ Refresh Token ক্লিয়ার করা
     await this.prisma.user.update({
       where: { id: userId },
       data: { hashedRefreshToken: null },
@@ -194,10 +195,41 @@ export class AuthService {
     // ⚡ ২. Redis User Auth Cache ক্লিয়ার করা
     await this.clearUserAuthCache(email);
 
-    // ⚡ ৩. Security Audit Trail Log (Point 4)
-    this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) successfully logged out at ${new Date().toISOString()}`);
+    // ⚡ ৩. Access Token টি Redis Blacklist-এ রাখা (১৫ মিনিট TTL)
+    if (accessToken) {
+      try {
+        const cleanToken = accessToken.replace('Bearer ', '');
+        await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+      } catch (err) {
+        // ignore
+      }
+    }
 
+    this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) logged out.`);
     return { message: 'Successfully logged out' };
+  }
+
+  // 🔒 ৪.২ সব ডিভাইস থেকে লগআউট (Logout All Devices)
+  async logoutAllDevices(userId: string, email: string, accessToken?: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { hashedRefreshToken: null },
+    });
+
+    await this.clearUserAuthCache(email);
+
+    // ⚡ Access Token Blacklisting for current device as well
+    if (accessToken) {
+      try {
+        const cleanToken = accessToken.replace('Bearer ', '');
+        await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) logged out from ALL devices.`);
+    return { message: 'Successfully logged out from all devices' };
   }
 
 }

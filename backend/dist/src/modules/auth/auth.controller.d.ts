@@ -1,4 +1,4 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -28,7 +28,13 @@ export declare class AuthController {
     logout(user: {
         id: string;
         email: string;
-    }, res: Response): Promise<{
+    }, req: Request, res: Response): Promise<{
+        message: string;
+    }>;
+    logoutAll(user: {
+        id: string;
+        email: string;
+    }, req: Request, res: Response): Promise<{
         message: string;
     }>;
     private setRefreshTokenCookie;

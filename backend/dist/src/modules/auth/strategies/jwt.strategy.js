@@ -8,24 +8,44 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JwtStrategy = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const passport_1 = require("@nestjs/passport");
 const passport_jwt_1 = require("passport-jwt");
+const cache_manager_1 = require("@nestjs/cache-manager");
 const prisma_service_1 = require("../../../common/prisma/prisma.service");
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy, 'jwt') {
     prisma;
-    constructor(configService, prisma) {
+    cacheManager;
+    constructor(configService, prisma, cacheManager) {
         super({
             jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
             secretOrKey: configService.get('JWT_ACCESS_SECRET'),
+            passReqToCallback: true,
         });
         this.prisma = prisma;
+        this.cacheManager = cacheManager;
     }
-    async validate(payload) {
+    async validate(req, payload) {
+        const token = passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+        if (token) {
+            try {
+                const isBlacklisted = await this.cacheManager.get(`auth:blacklist:${token}`);
+                if (isBlacklisted) {
+                    throw new common_1.UnauthorizedException('Token has been revoked/logged out');
+                }
+            }
+            catch (err) {
+                if (err instanceof common_1.UnauthorizedException)
+                    throw err;
+            }
+        }
         const user = await this.prisma.user.findUnique({
             where: { id: payload.sub },
         });
@@ -39,7 +59,8 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
 exports.JwtStrategy = JwtStrategy;
 exports.JwtStrategy = JwtStrategy = __decorate([
     (0, common_1.Injectable)(),
+    __param(2, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
     __metadata("design:paramtypes", [config_1.ConfigService,
-        prisma_service_1.PrismaService])
+        prisma_service_1.PrismaService, Object])
 ], JwtStrategy);
 //# sourceMappingURL=jwt.strategy.js.map

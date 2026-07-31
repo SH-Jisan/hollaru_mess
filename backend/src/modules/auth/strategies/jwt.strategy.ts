@@ -1,24 +1,41 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { PrismaService } from '../../../common/prisma/prisma.service';
+import { Request } from 'express';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     configService: ConfigService,
     private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_ACCESS_SECRET') as string,
+      passReqToCallback: true, // 👈 req অবজেক্ট পাওয়ার জন্য
     });
   }
 
-  // টোকেনটি ভ্যালিড হলে Passport স্বয়ংক্রিয়ভাবে এই মেথডটি কল করে এবং ডিকোড করা পেলোড পাস করে
-  async validate(payload: { sub: string; email: string }) {
+  async validate(req: Request, payload: { sub: string; email: string }) {
+    // ⚡ 1. Check if Access Token is Blacklisted in Redis
+    const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+    if (token) {
+      try {
+        const isBlacklisted = await this.cacheManager.get(`auth:blacklist:${token}`);
+        if (isBlacklisted) {
+          throw new UnauthorizedException('Token has been revoked/logged out');
+        }
+      } catch (err) {
+        if (err instanceof UnauthorizedException) throw err;
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
@@ -27,7 +44,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('User no longer exists');
     }
 
-    // পাসওয়ার্ড ও রিফ্রেশ টোকেন বাদ দিয়ে ইউজার অবজেক্ট পাঠানো, যা req.user-এ অ্যাসাইন হবে
     const { hashedPassword, hashedRefreshToken, ...userWithoutSecrets } = user;
     return userWithoutSecrets;
   }

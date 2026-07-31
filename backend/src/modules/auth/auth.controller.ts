@@ -4,6 +4,7 @@ import {
   HttpCode, 
   HttpStatus, 
   Post, 
+  Req,
   Res, 
   UseGuards 
 } from '@nestjs/common';
@@ -13,7 +14,7 @@ import {
   ApiResponse, 
   ApiTags 
 } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -56,22 +57,46 @@ export class AuthController {
     return this.authService.refresh(refreshDto);
   }
 
-  @Post('logout')
+    @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Logout user and invalidate refresh tokens' })
-  @ApiResponse({ status: 200, description: 'User successfully logged out.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized request.' })
-  logout(@CurrentUser() user: { id: string; email: string }, @Res({ passthrough: true }) res: Response) {
+  @ApiOperation({ summary: 'Logout user from current device' })
+  logout(
+    @CurrentUser() user: { id: string; email: string },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const authHeader = req.headers['authorization'] || '';
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       path: '/auth',
     });
-    return this.authService.logout(user.id, user.email);
+    return this.authService.logout(user.id, user.email, authHeader);
   }
+
+  @Post('logout-all')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout user from ALL connected devices' })
+  logoutAll(
+    @CurrentUser() user: { id: string; email: string },
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const authHeader = req.headers['authorization'] || '';
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/auth',
+    });
+    return this.authService.logoutAllDevices(user.id, user.email, authHeader);
+  }
+
 
   private setRefreshTokenCookie(res: Response, refreshToken: string) {
     res.cookie('refreshToken', refreshToken, {

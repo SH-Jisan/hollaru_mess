@@ -183,14 +183,39 @@ let AuthService = AuthService_1 = class AuthService {
             data: { hashedRefreshToken },
         });
     }
-    async logout(userId, email) {
+    async logout(userId, email, accessToken) {
         await this.prisma.user.update({
             where: { id: userId },
             data: { hashedRefreshToken: null },
         });
         await this.clearUserAuthCache(email);
-        this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) successfully logged out at ${new Date().toISOString()}`);
+        if (accessToken) {
+            try {
+                const cleanToken = accessToken.replace('Bearer ', '');
+                await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+            }
+            catch (err) {
+            }
+        }
+        this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) logged out.`);
         return { message: 'Successfully logged out' };
+    }
+    async logoutAllDevices(userId, email, accessToken) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { hashedRefreshToken: null },
+        });
+        await this.clearUserAuthCache(email);
+        if (accessToken) {
+            try {
+                const cleanToken = accessToken.replace('Bearer ', '');
+                await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+            }
+            catch (err) {
+            }
+        }
+        this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) logged out from ALL devices.`);
+        return { message: 'Successfully logged out from all devices' };
     }
 };
 exports.AuthService = AuthService;

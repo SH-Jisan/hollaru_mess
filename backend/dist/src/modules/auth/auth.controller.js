@@ -39,14 +39,25 @@ let AuthController = class AuthController {
     refresh(refreshDto) {
         return this.authService.refresh(refreshDto);
     }
-    logout(user, res) {
+    logout(user, req, res) {
+        const authHeader = req.headers['authorization'] || '';
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
             path: '/auth',
         });
-        return this.authService.logout(user.id, user.email);
+        return this.authService.logout(user.id, user.email, authHeader);
+    }
+    logoutAll(user, req, res) {
+        const authHeader = req.headers['authorization'] || '';
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path: '/auth',
+        });
+        return this.authService.logoutAllDevices(user.id, user.email, authHeader);
     }
     setRefreshTokenCookie(res, refreshToken) {
         res.cookie('refreshToken', refreshToken, {
@@ -98,15 +109,27 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiBearerAuth)(),
-    (0, swagger_1.ApiOperation)({ summary: 'Logout user and invalidate refresh tokens' }),
-    (0, swagger_1.ApiResponse)({ status: 200, description: 'User successfully logged out.' }),
-    (0, swagger_1.ApiResponse)({ status: 401, description: 'Unauthorized request.' }),
+    (0, swagger_1.ApiOperation)({ summary: 'Logout user from current device' }),
     __param(0, (0, user_decorator_1.CurrentUser)()),
-    __param(1, (0, common_1.Res)({ passthrough: true })),
+    __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object, Object, Object]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "logout", null);
+__decorate([
+    (0, common_1.Post)('logout-all'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Logout user from ALL connected devices' }),
+    __param(0, (0, user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "logoutAll", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Authentication'),
     (0, common_1.Controller)('auth'),
