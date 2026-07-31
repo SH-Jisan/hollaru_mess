@@ -44,6 +44,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var AuthService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
@@ -53,11 +54,12 @@ const cache_manager_1 = require("@nestjs/cache-manager");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto = __importStar(require("crypto"));
 const prisma_service_1 = require("../../common/prisma/prisma.service");
-let AuthService = class AuthService {
+let AuthService = AuthService_1 = class AuthService {
     prisma;
     jwtService;
     configService;
     cacheManager;
+    logger = new common_1.Logger(AuthService_1.name);
     constructor(prisma, jwtService, configService, cacheManager) {
         this.prisma = prisma;
         this.jwtService = jwtService;
@@ -181,9 +183,18 @@ let AuthService = class AuthService {
             data: { hashedRefreshToken },
         });
     }
+    async logout(userId, email) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { hashedRefreshToken: null },
+        });
+        await this.clearUserAuthCache(email);
+        this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) successfully logged out at ${new Date().toISOString()}`);
+        return { message: 'Successfully logged out' };
+    }
 };
 exports.AuthService = AuthService;
-exports.AuthService = AuthService = __decorate([
+exports.AuthService = AuthService = AuthService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(3, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,

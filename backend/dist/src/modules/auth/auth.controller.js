@@ -19,19 +19,43 @@ const auth_service_1 = require("./auth.service");
 const login_dto_1 = require("./dto/login.dto");
 const refresh_dto_1 = require("./dto/refresh.dto");
 const register_dto_1 = require("./dto/register.dto");
+const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
+const user_decorator_1 = require("../../common/decorators/user.decorator");
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
         this.authService = authService;
     }
-    register(registerDto) {
-        return this.authService.register(registerDto);
+    async register(registerDto, res) {
+        const result = await this.authService.register(registerDto);
+        this.setRefreshTokenCookie(res, result.refreshToken);
+        return result;
     }
-    login(loginDto) {
-        return this.authService.login(loginDto);
+    async login(loginDto, res) {
+        const result = await this.authService.login(loginDto);
+        this.setRefreshTokenCookie(res, result.refreshToken);
+        return result;
     }
     refresh(refreshDto) {
         return this.authService.refresh(refreshDto);
+    }
+    logout(user, res) {
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path: '/auth',
+        });
+        return this.authService.logout(user.id, user.email);
+    }
+    setRefreshTokenCookie(res, refreshToken) {
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            path: '/auth',
+            maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
     }
 };
 exports.AuthController = AuthController;
@@ -41,9 +65,10 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 201, description: 'User successfully registered.' }),
     (0, swagger_1.ApiResponse)({ status: 409, description: 'Email already exists.' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [register_dto_1.RegisterDto]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [register_dto_1.RegisterDto, Object]),
+    __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
 __decorate([
     (0, common_1.Post)('login'),
@@ -52,9 +77,10 @@ __decorate([
     (0, swagger_1.ApiResponse)({ status: 200, description: 'User successfully logged in.' }),
     (0, swagger_1.ApiResponse)({ status: 401, description: 'Invalid credentials.' }),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [login_dto_1.LoginDto]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [login_dto_1.LoginDto, Object]),
+    __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 __decorate([
     (0, common_1.Post)('refresh'),
@@ -67,6 +93,20 @@ __decorate([
     __metadata("design:paramtypes", [refresh_dto_1.RefreshDto]),
     __metadata("design:returntype", void 0)
 ], AuthController.prototype, "refresh", null);
+__decorate([
+    (0, common_1.Post)('logout'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiBearerAuth)(),
+    (0, swagger_1.ApiOperation)({ summary: 'Logout user and invalidate refresh tokens' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'User successfully logged out.' }),
+    (0, swagger_1.ApiResponse)({ status: 401, description: 'Unauthorized request.' }),
+    __param(0, (0, user_decorator_1.CurrentUser)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], AuthController.prototype, "logout", null);
 exports.AuthController = AuthController = __decorate([
     (0, swagger_1.ApiTags)('Authentication'),
     (0, common_1.Controller)('auth'),

@@ -10,6 +10,7 @@ export declare class AuthService {
     private jwtService;
     private configService;
     private cacheManager;
+    private readonly logger;
     constructor(prisma: PrismaService, jwtService: JwtService, configService: ConfigService, cacheManager: Cache);
     register(dto: RegisterDto): Promise<{
         accessToken: string;
@@ -34,4 +35,7 @@ export declare class AuthService {
     private generateTokens;
     private hashToken;
     private updateRefreshToken;
+    logout(userId: string, email: string): Promise<{
+        message: string;
+    }>;
 }

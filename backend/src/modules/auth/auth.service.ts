@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+   BadRequestException, 
+   ConflictException, 
+   Inject, 
+   Injectable, 
+   UnauthorizedException,
+   Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -12,6 +19,7 @@ import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -174,5 +182,23 @@ export class AuthService {
       data: { hashedRefreshToken },
     });
   }
+
+    
+  async logout(userId: string, email: string) {
+    // ⚡ ১. Supabase PostgreSQL-এ Refresh Token মুছে দেওয়া
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { hashedRefreshToken: null },
+    });
+
+    // ⚡ ২. Redis User Auth Cache ক্লিয়ার করা
+    await this.clearUserAuthCache(email);
+
+    // ⚡ ৩. Security Audit Trail Log (Point 4)
+    this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) successfully logged out at ${new Date().toISOString()}`);
+
+    return { message: 'Successfully logged out' };
+  }
+
 }
 
