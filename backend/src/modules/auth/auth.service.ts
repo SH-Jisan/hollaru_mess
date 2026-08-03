@@ -93,7 +93,19 @@ export class AuthService {
       }
     }
 
-    if (!user) {
+    if (!user || !user.hashedPassword) {
+      // 🗄️ Fallback to Supabase Database if not in Redis or missing password hash
+      const dbUser = await this.prisma.user.findUnique({
+        where: { email: dto.email },
+      });
+
+      if (!dbUser) {
+        throw new UnauthorizedException('Invalid credentials');
+      }
+      user = dbUser;
+    }
+
+    if (!dto?.password || !user?.hashedPassword) {
       throw new UnauthorizedException('Invalid credentials');
     }
 

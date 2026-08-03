@@ -117,7 +117,16 @@ let AuthService = AuthService_1 = class AuthService {
                 }
             }
         }
-        if (!user) {
+        if (!user || !user.hashedPassword) {
+            const dbUser = await this.prisma.user.findUnique({
+                where: { email: dto.email },
+            });
+            if (!dbUser) {
+                throw new common_1.UnauthorizedException('Invalid credentials');
+            }
+            user = dbUser;
+        }
+        if (!dto?.password || !user?.hashedPassword) {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
         const isPasswordValid = await bcrypt.compare(dto.password, user.hashedPassword);
