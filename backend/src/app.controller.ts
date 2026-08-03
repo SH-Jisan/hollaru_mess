@@ -30,7 +30,7 @@ export class AppController {
 
 
   // ১. সাধারণ লগইন করা ইউজারদের জন্য সিকিউর রুট (MEMBER & MANAGER both)
-  @Get('secure-profile')
+  @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth() // Swagger-এ লক আইকন দেখানোর জন্য
   @ApiOperation({ summary: 'Get current logged in user details' })

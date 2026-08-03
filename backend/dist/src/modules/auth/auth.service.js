@@ -184,15 +184,19 @@ let AuthService = AuthService_1 = class AuthService {
         });
     }
     async logout(userId, email, accessToken) {
-        await this.prisma.user.update({
-            where: { id: userId },
-            data: { hashedRefreshToken: null },
-        });
-        await this.clearUserAuthCache(email);
+        await Promise.all([
+            this.prisma.user.update({
+                where: { id: userId },
+                data: { hashedRefreshToken: null },
+            }),
+            this.clearUserAuthCache(email),
+        ]);
         if (accessToken) {
             try {
-                const cleanToken = accessToken.replace('Bearer ', '');
-                await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+                const cleanToken = accessToken.replace('Bearer ', '').trim();
+                if (cleanToken) {
+                    await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+                }
             }
             catch (err) {
             }
@@ -201,15 +205,21 @@ let AuthService = AuthService_1 = class AuthService {
         return { message: 'Successfully logged out' };
     }
     async logoutAllDevices(userId, email, accessToken) {
-        await this.prisma.user.update({
-            where: { id: userId },
-            data: { hashedRefreshToken: null },
-        });
-        await this.clearUserAuthCache(email);
+        const revocationTimestamp = Math.floor(Date.now() / 1000);
+        await Promise.all([
+            this.prisma.user.update({
+                where: { id: userId },
+                data: { hashedRefreshToken: null },
+            }),
+            this.cacheManager.set(`auth:logout_all:${userId}`, revocationTimestamp, 900000).catch(() => { }),
+            this.clearUserAuthCache(email),
+        ]);
         if (accessToken) {
             try {
-                const cleanToken = accessToken.replace('Bearer ', '');
-                await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+                const cleanToken = accessToken.replace('Bearer ', '').trim();
+                if (cleanToken) {
+                    await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+                }
             }
             catch (err) {
             }

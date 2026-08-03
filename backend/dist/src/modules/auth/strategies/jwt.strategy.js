@@ -50,6 +50,18 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
                     throw err;
             }
         }
+        if (payload.iat) {
+            try {
+                const logoutAllTime = await this.cacheManager.get(`auth:logout_all:${payload.sub}`);
+                if (logoutAllTime && payload.iat <= logoutAllTime) {
+                    throw new common_1.UnauthorizedException('Session has been revoked by logout-all from another device');
+                }
+            }
+            catch (err) {
+                if (err instanceof common_1.UnauthorizedException)
+                    throw err;
+            }
+        }
         const cacheKey = `auth:user:${payload.email}`;
         let user = null;
         try {

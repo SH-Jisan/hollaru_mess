@@ -25,7 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(req: Request, payload: { sub: string; email: string; role?: string }) {
+  async validate(req: Request, payload: { sub: string; email: string; role?: string; iat?: number }) {
     // ⚡ 1. Check if Access Token is Blacklisted in Redis
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req) ||
      req?.cookies?.accessToken;
@@ -34,6 +34,18 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         const isBlacklisted = await this.cacheManager.get(`auth:blacklist:${token}`);
         if (isBlacklisted) {
           throw new UnauthorizedException('Token has been revoked/logged out');
+        }
+      } catch (err) {
+        if (err instanceof UnauthorizedException) throw err;
+      }
+    }
+
+     // ⚡ ২. Global Logout-All Devices Timestamp Check (All Devices Instant Invalidation)
+    if (payload.iat) {
+      try {
+        const logoutAllTime = await this.cacheManager.get<number>(`auth:logout_all:${payload.sub}`);
+        if (logoutAllTime && payload.iat <= logoutAllTime) {
+          throw new UnauthorizedException('Session has been revoked by logout-all from another device');
         }
       } catch (err) {
         if (err instanceof UnauthorizedException) throw err;
