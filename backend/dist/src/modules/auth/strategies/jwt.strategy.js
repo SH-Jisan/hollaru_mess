@@ -24,7 +24,10 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
     cacheManager;
     constructor(configService, prisma, cacheManager) {
         super({
-            jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
+            jwtFromRequest: passport_jwt_1.ExtractJwt.fromExtractors([
+                passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
+                (req) => req?.cookies?.accessToken || null,
+            ]),
             ignoreExpiration: false,
             secretOrKey: configService.get('JWT_ACCESS_SECRET'),
             passReqToCallback: true,
@@ -33,7 +36,8 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         this.cacheManager = cacheManager;
     }
     async validate(req, payload) {
-        const token = passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+        const token = passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken()(req) ||
+            req?.cookies?.accessToken;
         if (token) {
             try {
                 const isBlacklisted = await this.cacheManager.get(`auth:blacklist:${token}`);
@@ -46,14 +50,30 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
                     throw err;
             }
         }
-        const user = await this.prisma.user.findUnique({
-            where: { id: payload.sub },
-        });
-        if (!user) {
-            throw new common_1.UnauthorizedException('User no longer exists');
+        const cacheKey = `auth:user:${payload.email}`;
+        let user = null;
+        try {
+            user = await this.cacheManager.get(cacheKey);
         }
-        const { hashedPassword, hashedRefreshToken, ...userWithoutSecrets } = user;
-        return userWithoutSecrets;
+        catch (err) {
+            user = null;
+        }
+        if (!user) {
+            const dbUser = await this.prisma.user.findUnique({
+                where: { id: payload.sub },
+            });
+            if (!dbUser) {
+                throw new common_1.UnauthorizedException('User no longer exists');
+            }
+            const { hashedPassword, hashedRefreshToken, ...safeUser } = dbUser;
+            user = safeUser;
+            try {
+                await this.cacheManager.set(cacheKey, user, 900000);
+            }
+            catch (err) {
+            }
+        }
+        return user;
     }
 };
 exports.JwtStrategy = JwtStrategy;

@@ -13,15 +13,7 @@ export declare class JwtStrategy extends JwtStrategy_base {
     validate(req: Request, payload: {
         sub: string;
         email: string;
-    }): Promise<{
-        name: string;
-        id: string;
-        email: string;
-        phone: string | null;
-        role: import("@prisma/client").$Enums.Role;
-        messId: string | null;
-        createdAt: Date;
-        fcmToken: string | null;
-    }>;
+        role?: string;
+    }): Promise<any>;
 }
 export {};

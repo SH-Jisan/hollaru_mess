@@ -42,13 +42,13 @@ export class MetricsInterceptor implements NestInterceptor {
 
     const path = route ? route.path : request.url.split('?')[0];
     const metricKey = `${method}:${path}`;
-    const startTime = Date.now();
+    const startTime = performance.now();
     const startMem = process.memoryUsage().heapUsed;
     const startCpu = process.cpuUsage();
 
     return next.handle().pipe(
       tap(async () => {
-        const duration = Date.now() - startTime;
+        const duration = Number((performance.now() - startTime).toFixed(2));
         const endMem = process.memoryUsage().heapUsed;
         const endCpu = process.cpuUsage(startCpu);
 
