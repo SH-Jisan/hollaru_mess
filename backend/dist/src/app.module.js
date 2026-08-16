@@ -25,6 +25,7 @@ const notification_module_1 = require("./modules/notification/notification.modul
 const system_module_1 = require("./modules/system/system.module");
 const core_1 = require("@nestjs/core");
 const metrics_interceptors_1 = require("./common/interceptors/metrics.interceptors");
+const throttler_1 = require("@nestjs/throttler");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -40,6 +41,12 @@ exports.AppModule = AppModule = __decorate([
                 ttl: 300000,
                 max: 500,
             }),
+            throttler_1.ThrottlerModule.forRoot([
+                {
+                    ttl: 60000,
+                    limit: 100,
+                },
+            ]),
             nestjs_prometheus_1.PrometheusModule.register({
                 defaultMetrics: {
                     enabled: true,
@@ -49,8 +56,10 @@ exports.AppModule = AppModule = __decorate([
             bullmq_1.BullModule.forRootAsync({
                 imports: [config_1.ConfigModule],
                 useFactory: async (configService) => {
-                    let host = configService.get('REDIS_HOST_1') || configService.get('REDIS_HOST');
-                    let password = configService.get('REDIS_PASSWORD_1') || configService.get('REDIS_PASSWORD');
+                    let host = configService.get('REDIS_HOST_1')
+                        || configService.get('REDIS_HOST');
+                    let password = configService.get('REDIS_PASSWORD_1')
+                        || configService.get('REDIS_PASSWORD');
                     const secondaryHost = configService.get('REDIS_HOST_2');
                     const secondaryPassword = configService.get('REDIS_PASSWORD_2');
                     if (host && secondaryHost) {
@@ -60,7 +69,8 @@ exports.AppModule = AppModule = __decorate([
                                 host,
                                 port: configService.get('REDIS_PORT_1', 6379),
                                 password,
-                                tls: (configService.get('REDIS_TLS_1') || configService.get('REDIS_TLS')) === 'true' ? {} : undefined,
+                                tls: (configService.get('REDIS_TLS_1')
+                                    || configService.get('REDIS_TLS')) === 'true' ? {} : undefined,
                                 connectTimeout: 2000,
                                 maxRetriesPerRequest: 1,
                             });
@@ -105,6 +115,10 @@ exports.AppModule = AppModule = __decorate([
             {
                 provide: core_1.APP_INTERCEPTOR,
                 useClass: metrics_interceptors_1.MetricsInterceptor,
+            },
+            {
+                provide: core_1.APP_GUARD,
+                useClass: throttler_1.ThrottlerGuard,
             },
         ],
     })

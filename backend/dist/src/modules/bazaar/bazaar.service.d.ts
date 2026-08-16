@@ -35,8 +35,8 @@ export declare class BazaarService {
     addDeposit(dto: CreateDepositDto, managerId: string): Promise<{
         id: string;
         createdAt: Date;
-        monthId: string;
         userId: string;
+        monthId: string;
         amount: number;
     }>;
 }

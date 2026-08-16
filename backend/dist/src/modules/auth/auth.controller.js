@@ -21,6 +21,7 @@ const refresh_dto_1 = require("./dto/refresh.dto");
 const register_dto_1 = require("./dto/register.dto");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const user_decorator_1 = require("../../common/decorators/user.decorator");
+const throttler_1 = require("@nestjs/throttler");
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
@@ -72,6 +73,7 @@ let AuthController = class AuthController {
 exports.AuthController = AuthController;
 __decorate([
     (0, common_1.Post)('register'),
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
     (0, swagger_1.ApiOperation)({ summary: 'Register a new mess member' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: 'User successfully registered.' }),
     (0, swagger_1.ApiResponse)({ status: 409, description: 'Email already exists.' }),
@@ -83,6 +85,7 @@ __decorate([
 ], AuthController.prototype, "register", null);
 __decorate([
     (0, common_1.Post)('login'),
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: 'Login user with email and password' }),
     (0, swagger_1.ApiResponse)({ status: 200, description: 'User successfully logged in.' }),

@@ -14,8 +14,9 @@ import { BazaarModule } from './modules/bazaar/bazaar.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { SystemModule } from './modules/system/system.module';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -28,6 +29,12 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
       ttl: 300000,
       max: 500,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     PrometheusModule.register({
       defaultMetrics: {
         enabled: true,
@@ -37,8 +44,10 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        let host = configService.get<string>('REDIS_HOST_1') || configService.get<string>('REDIS_HOST');
-        let password = configService.get<string>('REDIS_PASSWORD_1') || configService.get<string>('REDIS_PASSWORD');
+        let host = configService.get<string>('REDIS_HOST_1') 
+        || configService.get<string>('REDIS_HOST');
+        let password = configService.get<string>('REDIS_PASSWORD_1') 
+        || configService.get<string>('REDIS_PASSWORD');
         const secondaryHost = configService.get<string>('REDIS_HOST_2');
         const secondaryPassword = configService.get<string>('REDIS_PASSWORD_2');
 
@@ -50,7 +59,8 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
               host,
               port: configService.get<number>('REDIS_PORT_1', 6379),
               password,
-              tls: (configService.get<string>('REDIS_TLS_1') || configService.get<string>('REDIS_TLS')) === 'true' ? {} : undefined,
+              tls: (configService.get<string>('REDIS_TLS_1') 
+              || configService.get<string>('REDIS_TLS')) === 'true' ? {} : undefined,
               connectTimeout: 2000,
               maxRetriesPerRequest: 1,
             });
@@ -95,6 +105,10 @@ import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
     {
       provide: APP_INTERCEPTOR,
       useClass: MetricsInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

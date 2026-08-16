@@ -22,6 +22,7 @@ export declare class AuthService {
             role: import("@prisma/client").$Enums.Role;
         };
     }>;
+    private verifyTurnstileToken;
     login(dto: LoginDto): Promise<{
         accessToken: string;
         refreshToken: string;

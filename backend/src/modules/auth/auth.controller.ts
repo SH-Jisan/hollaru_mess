@@ -21,6 +21,7 @@ import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/user.decorator';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -28,6 +29,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 }})
   @ApiOperation({ summary: 'Register a new mess member' })
   @ApiResponse({ status: 201, description: 'User successfully registered.' })
   @ApiResponse({ status: 409, description: 'Email already exists.' })
@@ -38,6 +40,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 }})
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login user with email and password' })
   @ApiResponse({ status: 200, description: 'User successfully logged in.' })

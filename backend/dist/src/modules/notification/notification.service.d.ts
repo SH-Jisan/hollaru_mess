@@ -14,18 +14,18 @@ export declare class NotificationService implements OnModuleInit {
         id: string;
         createdAt: Date;
         title: string;
-        userId: string;
         body: string;
         isRead: boolean;
+        userId: string;
     }>;
     sendNotificationToMess(messId: string, title: string, body: string): Promise<void>;
     getUserNotifications(userId: string): Promise<{
         id: string;
         createdAt: Date;
         title: string;
-        userId: string;
         body: string;
         isRead: boolean;
+        userId: string;
     }[]>;
     markAsRead(notificationId: string, userId: string): Promise<import("@prisma/client").Prisma.BatchPayload>;
 }

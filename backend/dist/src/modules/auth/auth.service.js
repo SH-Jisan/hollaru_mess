@@ -54,6 +54,7 @@ const cache_manager_1 = require("@nestjs/cache-manager");
 const bcrypt = __importStar(require("bcrypt"));
 const crypto = __importStar(require("crypto"));
 const prisma_service_1 = require("../../common/prisma/prisma.service");
+const client_1 = require("@prisma/client");
 let AuthService = AuthService_1 = class AuthService {
     prisma;
     jwtService;
@@ -67,6 +68,17 @@ let AuthService = AuthService_1 = class AuthService {
         this.cacheManager = cacheManager;
     }
     async register(dto) {
+        if (dto.honeypot && dto.honeypot.trim().length > 0) {
+            this.logger.warn(`🤖 BOT TRAPPED: Honeypot field filled by automated bot from email: ${dto.email}`);
+            throw new common_1.BadRequestException('Bot activity detected.');
+        }
+        const turnstileSecret = this.configService.get('TURNSTILE_SECRET_KEY');
+        if (turnstileSecret && dto.captchaToken) {
+            const isHuman = await this.verifyTurnstileToken(dto.captchaToken, turnstileSecret);
+            if (!isHuman) {
+                throw new common_1.BadRequestException('Captcha verification failed. Automated bot activity suspected.');
+            }
+        }
         const existingUser = await this.prisma.user.findUnique({
             where: { email: dto.email },
         });
@@ -77,23 +89,58 @@ let AuthService = AuthService_1 = class AuthService {
         const tokens = await this.generateTokens(userId, dto.email, 'MEMBER');
         const hashedPassword = await bcrypt.hash(dto.password, 10);
         const hashedRefreshToken = this.hashToken(tokens.refreshToken);
-        const user = await this.prisma.user.create({
-            data: {
-                id: userId,
-                name: dto.name,
-                email: dto.email,
-                phone: dto.phone,
-                hashedPassword,
-                hashedRefreshToken,
-            },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-            },
-        });
-        return { user, ...tokens };
+        try {
+            const user = await this.prisma.$transaction(async (tx) => {
+                const newUser = await tx.user.create({
+                    data: {
+                        id: userId,
+                        name: dto.name,
+                        email: dto.email,
+                        phone: dto.phone,
+                        hashedPassword,
+                        hashedRefreshToken,
+                    },
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        role: true,
+                    },
+                });
+                await tx.notification.create({
+                    data: {
+                        userId: newUser.id,
+                        title: 'Welcome to Mess Manager! 🎉',
+                        body: `Hello ${newUser.name}, welcome to Hollaru Mess Manager. You can now join or manage your mess.`,
+                    },
+                });
+                return newUser;
+            });
+            return { user, ...tokens };
+        }
+        catch (error) {
+            if (error instanceof client_1.Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+                throw new common_1.ConflictException('Email address is already registered');
+            }
+            throw error;
+        }
+    }
+    async verifyTurnstileToken(token, secretKey) {
+        try {
+            const formData = new URLSearchParams();
+            formData.append('secret', secretKey);
+            formData.append('response', token);
+            const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+                method: 'POST',
+                body: formData,
+            });
+            const outcome = await res.json();
+            return outcome.success === true;
+        }
+        catch (err) {
+            this.logger.error('Turnstile verification request failed:', err);
+            return true;
+        }
     }
     async login(dto) {
         const cacheKey = `auth:user:${dto.email}`;

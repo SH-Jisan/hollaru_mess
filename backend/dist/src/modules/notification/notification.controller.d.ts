@@ -14,9 +14,9 @@ export declare class NotificationController {
         id: string;
         createdAt: Date;
         title: string;
-        userId: string;
         body: string;
         isRead: boolean;
+        userId: string;
     }[]>;
     markAsRead(id: string, user: {
         id: string;

@@ -13,11 +13,11 @@ export declare class MealsService {
         id: string;
         createdAt: Date;
         type: string;
+        userId: string;
         category: string;
         count: number;
         status: import("@prisma/client").$Enums.RequestStatus;
         logId: string;
-        userId: string;
     }>;
     approveRequest(requestId: string, managerId: string): Promise<{
         message: string;

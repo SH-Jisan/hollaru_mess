@@ -37,8 +37,8 @@ export declare class BazaarController {
     }): Promise<{
         id: string;
         createdAt: Date;
-        monthId: string;
         userId: string;
+        monthId: string;
         amount: number;
     }>;
 }

@@ -16,6 +16,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -29,6 +30,20 @@ export class AuthService {
 
   // ১. মেম্বার রেজিস্ট্রেশন লজিক (Ultra Fast)
   async register(dto: RegisterDto) {
+    // 🛡️ ANTI-BOT DEFENSE 1: Honeypot Trap Check
+    if (dto.honeypot && dto.honeypot.trim().length > 0) {
+      this.logger.warn(`🤖 BOT TRAPPED: Honeypot field filled by automated bot from email: ${dto.email}`);
+      throw new BadRequestException('Bot activity detected.');
+    }
+
+    const turnstileSecret = this.configService.get<string>('TURNSTILE_SECRET_KEY');
+    if(turnstileSecret && dto.captchaToken){
+      const isHuman = await this.verifyTurnstileToken(dto.captchaToken, turnstileSecret);
+      if(!isHuman){
+        throw new BadRequestException('Captcha verification failed. Automated bot activity suspected.');
+      }
+    }
+
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -44,26 +59,66 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(dto.password, 10);
     const hashedRefreshToken = this.hashToken(tokens.refreshToken);
 
-    const user = await this.prisma.user.create({
-      data: {
-        id: userId,
-        name: dto.name,
-        email: dto.email,
-        phone: dto.phone,
-        hashedPassword,
-        hashedRefreshToken,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-      },
+    
+    // ⚛️ ATOMIC PRISMA TRANSACTION: Ensure user creation and welcome notification execute atomically
+    try{
+    const user = await this.prisma.$transaction(async (tx) => {
+      // ১. ইউজার ক্রিয়েট করা
+      const newUser = await tx.user.create({
+        data: {
+          id: userId,
+          name: dto.name,
+          email: dto.email,
+          phone: dto.phone,
+          hashedPassword,
+          hashedRefreshToken,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      });
+      // ২. ইউজারের জন্য সিস্টেম ওয়েলকাম নোটিফিকেশন তৈরি করা
+      await tx.notification.create({
+        data: {
+          userId: newUser.id,
+          title: 'Welcome to Mess Manager! 🎉',
+          body: `Hello ${newUser.name}, welcome to Hollaru Mess Manager. You can now join or manage your mess.`,
+        },
+      });
+      return newUser;
     });
 
     return { user, ...tokens };
   }
+  catch(error){
+    // 🛡️ RACE CONDITION DEFENSE: Catch Prisma duplicate key error P2002 cleanly
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Email address is already registered');
+      }
+      throw error;
+  }
+  }
 
+  private async verifyTurnstileToken(token: string, secretKey: string): Promise<boolean> {
+    try {
+      const formData = new URLSearchParams();
+      formData.append('secret', secretKey);
+      formData.append('response', token);
+      const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        body: formData,
+      });
+      const outcome = await res.json();
+      return outcome.success === true;
+    } catch (err) {
+      this.logger.error('Turnstile verification request failed:', err);
+      return true; // Fail-safe to avoid blocking legitimate users on network timeout
+    }
+  }
+  
   // ২. লগইন ভেরিফিকেশন লজিক (Ultra Fast Sub-50ms with Secure Redis Auth Cache)
   async login(dto: LoginDto) {
     const cacheKey = `auth:user:${dto.email}`;
@@ -252,6 +307,4 @@ export class AuthService {
     this.logger.log(`🔒 SECURITY AUDIT: User [${userId}] (${email}) logged out from ALL devices.`);
     return { message: 'Successfully logged out from all devices' };
   }
-
 }
-
