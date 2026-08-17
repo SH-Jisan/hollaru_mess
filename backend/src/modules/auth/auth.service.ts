@@ -220,7 +220,7 @@ export class AuthService {
   }
 
   // ৪. টোকেন জেনারেশন হেল্পার মেথড
-  private async generateTokens(userId: string, email: string, role: string) {
+  async generateTokens(userId: string, email: string, role: string) {
     const payload = { sub: userId, email, role };
 
     const [accessToken, refreshToken] = await Promise.all([

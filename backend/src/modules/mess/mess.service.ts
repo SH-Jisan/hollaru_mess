@@ -7,14 +7,16 @@ import { ContextValidatorService } from '../../common/services/context-validator
 import { MessCodeNotFoundException } from '../../common/exceptions/domain.exception';
 import { CreateMessDto } from './dto/create-mess.dto';
 import { JoinMessDto } from './dto/join-mess.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class MessService {
   constructor(
     private prisma: PrismaService,
     private validator: ContextValidatorService,
+    private authService: AuthService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {}
+  ) { }
 
   // ১. নতুন মেস তৈরি করা
   async createMess(dto: CreateMessDto, userId: string) {
@@ -25,7 +27,7 @@ export class MessService {
     const timePart = Date.now().toString(36).toUpperCase().slice(-4);
     const code = `MESS-${emailPart}${timePart}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    const mess = await this.prisma.$transaction(async (tx) => {
       const mess = await tx.mess.create({
         data: {
           name: dto.name,
@@ -41,9 +43,17 @@ export class MessService {
           role: Role.MANAGER,
         },
       });
-
       return mess;
     });
+    // 🔴 INVALIDATION: ইউজারের পুরনো MEMBER ক্যাশ মুছে দেওয়া যাতে সাথে সাথে MANAGER রোল কার্যকর হয়
+    try {
+      await this.cacheManager.del(`auth:user:${user.email}`);
+    } catch (err) {
+      // Catch error cleanly if Redis is down
+    }
+
+    const tokens = await this.authService.generateTokens(userId, user.email, Role.MANAGER);
+    return { mess, ...tokens };
   }
 
   // ২. ইনভাইট কোড দিয়ে মেসে জয়েন করা
@@ -58,7 +68,7 @@ export class MessService {
       throw new MessCodeNotFoundException();
     }
 
-    await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: {
         messId: mess.id,
@@ -66,11 +76,20 @@ export class MessService {
       },
     });
 
-    // 🔴 Invalidation: নতুন সদস্য জয়েন করায় মেসের মেম্বার লিস্টের ক্যাশ মুছে দেওয়া
-    const cacheKey = `mess:${mess.id}:members`;
-    await this.cacheManager.del(cacheKey);
+    // 🔴 Invalidation: মেম্বার লিস্টের ক্যাশ এবং ইউজারের প্রোফাইল ক্যাশ মুছে দেওয়া
+    const memberCacheKey = `mess:${mess.id}:members`;
+    try {
+      await Promise.all([
+        this.cacheManager.del(memberCacheKey),
+        this.cacheManager.del(`auth:user:${updatedUser.email}`),
+      ]);
+    } catch (err) {
+      // Catch error cleanly if Redis is down
+    }
 
-    return { message: 'Successfully joined the mess', messName: mess.name };
+    const token = await this.authService.generateTokens(userId, updatedUser.email, Role.MEMBER);
+
+    return { message: 'Successfully joined the mess', messName: mess.name, ...token };
   }
 
   // ৩. মেসের সব মেম্বারদের তালিকা দেখা (Cache-Aside Pattern)

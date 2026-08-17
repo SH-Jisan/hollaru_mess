@@ -19,13 +19,16 @@ const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
 const context_validator_service_1 = require("../../common/services/context-validator.service");
 const domain_exception_1 = require("../../common/exceptions/domain.exception");
+const auth_service_1 = require("../auth/auth.service");
 let MessService = class MessService {
     prisma;
     validator;
+    authService;
     cacheManager;
-    constructor(prisma, validator, cacheManager) {
+    constructor(prisma, validator, authService, cacheManager) {
         this.prisma = prisma;
         this.validator = validator;
+        this.authService = authService;
         this.cacheManager = cacheManager;
     }
     async createMess(dto, userId) {
@@ -34,7 +37,7 @@ let MessService = class MessService {
         const emailPart = user.email.split('@')[0].substring(0, 2).toUpperCase().padEnd(2, 'X');
         const timePart = Date.now().toString(36).toUpperCase().slice(-4);
         const code = `MESS-${emailPart}${timePart}`;
-        return this.prisma.$transaction(async (tx) => {
+        const mess = await this.prisma.$transaction(async (tx) => {
             const mess = await tx.mess.create({
                 data: {
                     name: dto.name,
@@ -51,6 +54,13 @@ let MessService = class MessService {
             });
             return mess;
         });
+        try {
+            await this.cacheManager.del(`auth:user:${user.email}`);
+        }
+        catch (err) {
+        }
+        const tokens = await this.authService.generateTokens(userId, user.email, client_1.Role.MANAGER);
+        return { mess, ...tokens };
     }
     async joinMess(dto, userId) {
         await this.validator.validateUserHasNoMess(userId);
@@ -60,16 +70,24 @@ let MessService = class MessService {
         if (!mess) {
             throw new domain_exception_1.MessCodeNotFoundException();
         }
-        await this.prisma.user.update({
+        const updatedUser = await this.prisma.user.update({
             where: { id: userId },
             data: {
                 messId: mess.id,
                 role: client_1.Role.MEMBER,
             },
         });
-        const cacheKey = `mess:${mess.id}:members`;
-        await this.cacheManager.del(cacheKey);
-        return { message: 'Successfully joined the mess', messName: mess.name };
+        const memberCacheKey = `mess:${mess.id}:members`;
+        try {
+            await Promise.all([
+                this.cacheManager.del(memberCacheKey),
+                this.cacheManager.del(`auth:user:${updatedUser.email}`),
+            ]);
+        }
+        catch (err) {
+        }
+        const token = await this.authService.generateTokens(userId, updatedUser.email, client_1.Role.MEMBER);
+        return { message: 'Successfully joined the mess', messName: mess.name, ...token };
     }
     async getMembers(userId) {
         const { user } = await this.validator.validateUserAndMess(userId);
@@ -96,8 +114,9 @@ let MessService = class MessService {
 exports.MessService = MessService;
 exports.MessService = MessService = __decorate([
     (0, common_1.Injectable)(),
-    __param(2, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __param(3, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        context_validator_service_1.ContextValidatorService, Object])
+        context_validator_service_1.ContextValidatorService,
+        auth_service_1.AuthService, Object])
 ], MessService);
 //# sourceMappingURL=mess.service.js.map

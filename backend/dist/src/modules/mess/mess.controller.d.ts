@@ -7,20 +7,26 @@ export declare class MessController {
     createMess(createMessDto: CreateMessDto, user: {
         id: string;
     }): Promise<{
-        name: string;
-        id: string;
-        createdAt: Date;
-        code: string;
-        managerId: string;
-        isMonthActive: boolean;
-        currentMonthId: string | null;
-        requestStartTime: string;
-        lunchEndTime: string;
-        dinnerEndTime: string;
+        accessToken: string;
+        refreshToken: string;
+        mess: {
+            name: string;
+            id: string;
+            createdAt: Date;
+            code: string;
+            managerId: string;
+            isMonthActive: boolean;
+            currentMonthId: string | null;
+            requestStartTime: string;
+            lunchEndTime: string;
+            dinnerEndTime: string;
+        };
     }>;
     joinMess(joinMessDto: JoinMessDto, user: {
         id: string;
     }): Promise<{
+        accessToken: string;
+        refreshToken: string;
         message: string;
         messName: string;
     }>;

@@ -10,11 +10,13 @@ exports.MessModule = void 0;
 const common_1 = require("@nestjs/common");
 const mess_controller_1 = require("./mess.controller");
 const mess_service_1 = require("./mess.service");
+const auth_module_1 = require("../auth/auth.module");
 let MessModule = class MessModule {
 };
 exports.MessModule = MessModule;
 exports.MessModule = MessModule = __decorate([
     (0, common_1.Module)({
+        imports: [auth_module_1.AuthModule],
         controllers: [mess_controller_1.MessController],
         providers: [mess_service_1.MessService]
     })

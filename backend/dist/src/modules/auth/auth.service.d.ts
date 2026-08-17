@@ -33,7 +33,10 @@ export declare class AuthService {
         accessToken: string;
         refreshToken: string;
     }>;
-    private generateTokens;
+    generateTokens(userId: string, email: string, role: string): Promise<{
+        accessToken: string;
+        refreshToken: string;
+    }>;
     private hashToken;
     private updateRefreshToken;
     logout(userId: string, email: string, accessToken?: string): Promise<{
