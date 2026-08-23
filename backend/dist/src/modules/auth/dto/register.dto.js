@@ -47,12 +47,9 @@ __decorate([
     __metadata("design:type", String)
 ], RegisterDto.prototype, "phone", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'Secret@123', description: 'Password (min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char)' }),
+    (0, swagger_1.ApiProperty)({ example: 'password123', description: 'Password (min 6 characters)' }),
     (0, class_validator_1.IsNotEmpty)({ message: 'Password is required' }),
-    (0, class_validator_1.MinLength)(8, { message: 'Password must be at least 8 characters long' }),
-    (0, class_validator_1.Matches)(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/, {
-        message: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character (@$!%*?&#)',
-    }),
+    (0, class_validator_1.MinLength)(6, { message: 'Password must be at least 6 characters long' }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "password", void 0);
 __decorate([

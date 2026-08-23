@@ -44,7 +44,10 @@ export class AppController {
   @Roles(Role.MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Access manager-only dashboard test' })
-  getManagerData() {
-    return { message: 'Welcome Manager! This is private mess management data.' };
+  getManagerData(@CurrentUser() user: {messId: string}) {
+    return {
+       message: 'Welcome Manager! This is private mess management data.',
+       messId: user.messId,
+       };
   }
 }

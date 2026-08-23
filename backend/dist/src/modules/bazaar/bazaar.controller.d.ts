@@ -11,8 +11,8 @@ export declare class BazaarController {
         id: string;
         createdAt: Date;
         items: string;
-        monthId: string;
         status: string;
+        monthId: string;
         cost: number;
         shopperId: string | null;
         shopperName: string | null;
@@ -23,8 +23,8 @@ export declare class BazaarController {
         id: string;
         createdAt: Date;
         items: string;
-        monthId: string;
         status: string;
+        monthId: string;
         cost: number;
         shopperId: string | null;
         shopperName: string | null;

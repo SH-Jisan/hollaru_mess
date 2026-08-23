@@ -242,7 +242,7 @@ export class AuthService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
-  private async updateRefreshToken(userId: string, refreshToken: string) {
+  async updateRefreshToken(userId: string, refreshToken: string) {
     const hashedRefreshToken = this.hashToken(refreshToken);
     await this.prisma.user.update({
       where: { id: userId },

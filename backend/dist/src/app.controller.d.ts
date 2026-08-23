@@ -22,7 +22,10 @@ export declare class AppController {
         createdAt: Date;
         fcmToken: string | null;
     }, "hashedPassword" | "hashedRefreshToken">;
-    getManagerData(): {
+    getManagerData(user: {
+        messId: string;
+    }): {
         message: string;
+        messId: string;
     };
 }

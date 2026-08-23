@@ -40,8 +40,11 @@ let AppController = class AppController {
     getProfile(user) {
         return user;
     }
-    getManagerData() {
-        return { message: 'Welcome Manager! This is private mess management data.' };
+    getManagerData(user) {
+        return {
+            message: 'Welcome Manager! This is private mess management data.',
+            messId: user.messId,
+        };
     }
 };
 exports.AppController = AppController;
@@ -74,8 +77,9 @@ __decorate([
     (0, roles_decorator_1.Roles)(client_1.Role.MANAGER),
     (0, swagger_1.ApiBearerAuth)(),
     (0, swagger_1.ApiOperation)({ summary: 'Access manager-only dashboard test' }),
+    __param(0, (0, user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], AppController.prototype, "getManagerData", null);
 exports.AppController = AppController = __decorate([

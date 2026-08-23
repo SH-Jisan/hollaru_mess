@@ -10,8 +10,8 @@ export declare class AuthController {
         accessToken: string;
         refreshToken: string;
         user: {
-            name: string;
             id: string;
+            name: string;
             email: string;
             role: import("@prisma/client").$Enums.Role;
         };

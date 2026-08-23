@@ -6,7 +6,7 @@ export class LoginDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'strongpassword123' })
+  @ApiProperty({ example: 'password123' })
   @IsString()
   @IsNotEmpty()
   password: string;

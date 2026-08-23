@@ -53,6 +53,9 @@ export class MessService {
     }
 
     const tokens = await this.authService.generateTokens(userId, user.email, Role.MANAGER);
+        // ⚡ ৩. ডাটাবেজে নতুন রিফ্রেশ টোকেনটির হ্যাশ সেভ করা (বিশাল গুরুত্বপূর্ণ 🔴)
+    await this.authService.updateRefreshToken(userId, tokens.refreshToken);
+
     return { mess, ...tokens };
   }
 
@@ -87,7 +90,10 @@ export class MessService {
       // Catch error cleanly if Redis is down
     }
 
-    const token = await this.authService.generateTokens(userId, updatedUser.email, Role.MEMBER);
+    const tokens = await this.authService.generateTokens(userId, updatedUser.email, Role.MEMBER);
+    
+    // ⚡ ডাটাবেজে নতুন রিফ্রেশ টোকেনটির হ্যাশ সেভ করা (বিশাল গুরুত্বপূর্ণ 🔴)
+    await this.authService.updateRefreshToken(userId, tokens.refreshToken);
 
     return { message: 'Successfully joined the mess', messName: mess.name, ...token };
   }

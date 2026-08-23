@@ -60,6 +60,7 @@ let MessService = class MessService {
         catch (err) {
         }
         const tokens = await this.authService.generateTokens(userId, user.email, client_1.Role.MANAGER);
+        await this.authService.updateRefreshToken(userId, tokens.refreshToken);
         return { mess, ...tokens };
     }
     async joinMess(dto, userId) {
@@ -86,7 +87,8 @@ let MessService = class MessService {
         }
         catch (err) {
         }
-        const token = await this.authService.generateTokens(userId, updatedUser.email, client_1.Role.MEMBER);
+        const tokens = await this.authService.generateTokens(userId, updatedUser.email, client_1.Role.MEMBER);
+        await this.authService.updateRefreshToken(userId, tokens.refreshToken);
         return { message: 'Successfully joined the mess', messName: mess.name, ...token };
     }
     async getMembers(userId) {
