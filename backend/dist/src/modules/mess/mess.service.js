@@ -50,6 +50,7 @@ let MessService = class MessService {
                 data: {
                     messId: mess.id,
                     role: client_1.Role.MANAGER,
+                    joinedAt: new Date(),
                 },
             });
             return mess;
@@ -76,6 +77,7 @@ let MessService = class MessService {
             data: {
                 messId: mess.id,
                 role: client_1.Role.MEMBER,
+                joinedAt: new Date(),
             },
         });
         const memberCacheKey = `mess:${mess.id}:members`;
@@ -89,7 +91,7 @@ let MessService = class MessService {
         }
         const tokens = await this.authService.generateTokens(userId, updatedUser.email, client_1.Role.MEMBER);
         await this.authService.updateRefreshToken(userId, tokens.refreshToken);
-        return { message: 'Successfully joined the mess', messName: mess.name, ...token };
+        return { message: 'Successfully joined the mess', messName: mess.name, ...tokens };
     }
     async getMembers(userId) {
         const { user } = await this.validator.validateUserAndMess(userId);
@@ -106,7 +108,7 @@ let MessService = class MessService {
                 email: true,
                 phone: true,
                 role: true,
-                createdAt: true,
+                joinedAt: true,
             },
         });
         await this.cacheManager.set(cacheKey, members, 0);

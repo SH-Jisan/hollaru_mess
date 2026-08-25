@@ -13,6 +13,7 @@ export declare class ContextValidatorService {
             hashedRefreshToken: string | null;
             messId: string | null;
             createdAt: Date;
+            joinedAt: Date | null;
             fcmToken: string | null;
         };
         mess: {
@@ -39,6 +40,7 @@ export declare class ContextValidatorService {
             hashedRefreshToken: string | null;
             messId: string | null;
             createdAt: Date;
+            joinedAt: Date | null;
             fcmToken: string | null;
         };
         mess: {
@@ -66,6 +68,7 @@ export declare class ContextValidatorService {
             hashedRefreshToken: string | null;
             messId: string | null;
             createdAt: Date;
+            joinedAt: Date | null;
             fcmToken: string | null;
         };
         mess: {
@@ -91,6 +94,7 @@ export declare class ContextValidatorService {
         hashedRefreshToken: string | null;
         messId: string | null;
         createdAt: Date;
+        joinedAt: Date | null;
         fcmToken: string | null;
     }>;
 }

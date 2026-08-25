@@ -1,8 +1,10 @@
 import { User } from '@prisma/client';
 import { AppService } from './app.service';
+import { PrismaService } from './common/prisma/prisma.service';
 export declare class AppController {
     private readonly appService;
-    constructor(appService: AppService);
+    private readonly prisma;
+    constructor(appService: AppService, prisma: PrismaService);
     getHello(): string;
     getHealth(): {
         status: string;
@@ -20,12 +22,13 @@ export declare class AppController {
         hashedRefreshToken: string | null;
         messId: string | null;
         createdAt: Date;
+        joinedAt: Date | null;
         fcmToken: string | null;
     }, "hashedPassword" | "hashedRefreshToken">;
     getManagerData(user: {
         messId: string;
-    }): {
+    }): Promise<{
         message: string;
-        messId: string;
-    };
+        messCode: string | null;
+    }>;
 }

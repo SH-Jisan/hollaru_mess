@@ -15,8 +15,8 @@ export declare class BazaarService {
         id: string;
         createdAt: Date;
         items: string;
-        status: string;
         monthId: string;
+        status: string;
         cost: number;
         shopperId: string | null;
         shopperName: string | null;
@@ -25,8 +25,8 @@ export declare class BazaarService {
         id: string;
         createdAt: Date;
         items: string;
-        status: string;
         monthId: string;
+        status: string;
         cost: number;
         shopperId: string | null;
         shopperName: string | null;

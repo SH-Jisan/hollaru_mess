@@ -41,6 +41,7 @@ export class MessService {
         data: {
           messId: mess.id,
           role: Role.MANAGER,
+          joinedAt: new Date(),
         },
       });
       return mess;
@@ -76,6 +77,7 @@ export class MessService {
       data: {
         messId: mess.id,
         role: Role.MEMBER,
+        joinedAt: new Date(),
       },
     });
 
@@ -95,7 +97,7 @@ export class MessService {
     // ⚡ ডাটাবেজে নতুন রিফ্রেশ টোকেনটির হ্যাশ সেভ করা (বিশাল গুরুত্বপূর্ণ 🔴)
     await this.authService.updateRefreshToken(userId, tokens.refreshToken);
 
-    return { message: 'Successfully joined the mess', messName: mess.name, ...token };
+    return { message: 'Successfully joined the mess', messName: mess.name, ...tokens };
   }
 
   // ৩. মেসের সব মেম্বারদের তালিকা দেখা (Cache-Aside Pattern)
@@ -118,7 +120,7 @@ export class MessService {
         email: true,
         phone: true,
         role: true,
-        createdAt: true,
+        joinedAt: true,
       },
     });
 

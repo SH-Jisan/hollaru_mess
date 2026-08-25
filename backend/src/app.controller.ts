@@ -6,11 +6,15 @@ import { CurrentUser } from './common/decorators/user.decorator';
 import { Roles } from './common/decorators/roles.decorator';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { PrismaService } from './common/prisma/prisma.service';
 
 @ApiTags('App Test')
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   getHello(): string {
@@ -44,10 +48,14 @@ export class AppController {
   @Roles(Role.MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Access manager-only dashboard test' })
-  getManagerData(@CurrentUser() user: {messId: string}) {
+  async getManagerData(@CurrentUser() user: {messId: string}) {
+    const mess = user.messId
+    ? await this.prisma.mess.findUnique({where: {id: user.messId}})
+    : null;
+
     return {
        message: 'Welcome Manager! This is private mess management data.',
-       messId: user.messId,
+       messCode: mess?.code || null,
        };
   }
 }

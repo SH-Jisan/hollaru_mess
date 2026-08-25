@@ -14,8 +14,9 @@ export declare class MessService {
         accessToken: string;
         refreshToken: string;
         mess: {
-            id: string;
             name: string;
+            id: string;
+            createdAt: Date;
             code: string;
             managerId: string;
             isMonthActive: boolean;
@@ -23,9 +24,13 @@ export declare class MessService {
             requestStartTime: string;
             lunchEndTime: string;
             dinnerEndTime: string;
-            createdAt: Date;
         };
     }>;
-    joinMess(dto: JoinMessDto, userId: string): Promise<any>;
+    joinMess(dto: JoinMessDto, userId: string): Promise<{
+        accessToken: string;
+        refreshToken: string;
+        message: string;
+        messName: string;
+    }>;
     getMembers(userId: string): Promise<{}>;
 }

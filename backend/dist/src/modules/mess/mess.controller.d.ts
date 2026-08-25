@@ -10,8 +10,9 @@ export declare class MessController {
         accessToken: string;
         refreshToken: string;
         mess: {
-            id: string;
             name: string;
+            id: string;
+            createdAt: Date;
             code: string;
             managerId: string;
             isMonthActive: boolean;
@@ -19,12 +20,16 @@ export declare class MessController {
             requestStartTime: string;
             lunchEndTime: string;
             dinnerEndTime: string;
-            createdAt: Date;
         };
     }>;
     joinMess(joinMessDto: JoinMessDto, user: {
         id: string;
-    }): Promise<any>;
+    }): Promise<{
+        accessToken: string;
+        refreshToken: string;
+        message: string;
+        messName: string;
+    }>;
     getMembers(user: {
         id: string;
     }): Promise<{}>;

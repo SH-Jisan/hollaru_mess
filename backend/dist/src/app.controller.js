@@ -21,10 +21,13 @@ const user_decorator_1 = require("./common/decorators/user.decorator");
 const roles_decorator_1 = require("./common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("./common/guards/jwt-auth.guard");
 const roles_guard_1 = require("./common/guards/roles.guard");
+const prisma_service_1 = require("./common/prisma/prisma.service");
 let AppController = class AppController {
     appService;
-    constructor(appService) {
+    prisma;
+    constructor(appService, prisma) {
         this.appService = appService;
+        this.prisma = prisma;
     }
     getHello() {
         return this.appService.getHello();
@@ -40,10 +43,13 @@ let AppController = class AppController {
     getProfile(user) {
         return user;
     }
-    getManagerData(user) {
+    async getManagerData(user) {
+        const mess = user.messId
+            ? await this.prisma.mess.findUnique({ where: { id: user.messId } })
+            : null;
         return {
             message: 'Welcome Manager! This is private mess management data.',
-            messId: user.messId,
+            messCode: mess?.code || null,
         };
     }
 };
@@ -80,11 +86,12 @@ __decorate([
     __param(0, (0, user_decorator_1.CurrentUser)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:returntype", Promise)
 ], AppController.prototype, "getManagerData", null);
 exports.AppController = AppController = __decorate([
     (0, swagger_1.ApiTags)('App Test'),
     (0, common_1.Controller)(),
-    __metadata("design:paramtypes", [app_service_1.AppService])
+    __metadata("design:paramtypes", [app_service_1.AppService,
+        prisma_service_1.PrismaService])
 ], AppController);
 //# sourceMappingURL=app.controller.js.map
