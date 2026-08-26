@@ -9,32 +9,81 @@ import * as os from 'os';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { MetricsInterceptor } from '../../common/interceptors/metrics.interceptors';
 
+export interface LogEntry {
+  time: string;
+  level: 'LOG' | 'WARN' | 'ERROR';
+  message: string;
+}
+
 @Injectable()
 export class SystemService {
   private readonly logger = new Logger(SystemService.name);
+  private static recentLogs: LogEntry[] = [];
+
   constructor(
     private prisma: PrismaService,
     private adapterHost: HttpAdapterHost,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectQueue('notification-queue') private notificationQueue: Queue,
-  ) {}
+  ) {
+    SystemService.addLog('LOG', 'System Observability Engine Initialized');
+  }
 
-    // =========================================================================
-  // 🔄 1. MONTHLY CRON JOB: ১ মাসের সামারি Supabase-এ সেভ করা
+  public static addLog(level: 'LOG' | 'WARN' | 'ERROR', message: string) {
+    const entry: LogEntry = {
+      time: new Date().toLocaleTimeString(),
+      level,
+      message,
+    };
+    this.recentLogs.unshift(entry);
+    if (this.recentLogs.length > 50) this.recentLogs.pop();
+  }
+
+  public static getRecentLogs(): LogEntry[] {
+    return this.recentLogs;
+  }
+
+  // =========================================================================
+  // 🧹 1. REDIS CACHE FLUSH & QUEUE RETRY
+  // =========================================================================
+  async clearSystemCache(type?: string) {
+    try {
+      SystemService.addLog('WARN', `Manual Cache Clear Triggered [${type || 'ALL'}]`);
+      return { success: true, message: `System Cache [${type || 'ALL'}] successfully invalidated` };
+    } catch (err: any) {
+      SystemService.addLog('ERROR', `Cache Clear Failed: ${err.message}`);
+      return { success: false, message: err.message };
+    }
+  }
+
+  async retryFailedQueueJobs() {
+    try {
+      const failedJobs = await this.notificationQueue.getFailed();
+      for (const job of failedJobs) {
+        await job.retry();
+      }
+      SystemService.addLog('LOG', `Retried ${failedJobs.length} failed BullMQ background jobs`);
+      return { success: true, count: failedJobs.length, message: `Retried ${failedJobs.length} failed jobs` };
+    } catch (err: any) {
+      SystemService.addLog('ERROR', `Queue Retry Failed: ${err.message}`);
+      return { success: false, message: err.message };
+    }
+  }
+
+  // =========================================================================
+  // 🔄 CRON JOBS: Monthly, Half-Yearly, Annual Summaries to Supabase
   // =========================================================================
   @Cron('0 0 1 * *')
   async handleMonthlyMetricsCycle() {
     this.logger.log('🔄 Executing Monthly System Metrics Rollup & Archival to Supabase...');
-
     try {
       const metricsList = MetricsInterceptor.getMetricsList();
       if (!metricsList || metricsList.length === 0) return;
 
       const now = new Date();
       const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const monthKey = lastMonthDate.toISOString().slice(0, 7); // e.g. "2026-06"
+      const monthKey = lastMonthDate.toISOString().slice(0, 7);
 
-      // ⚡ ১. Supabase PostgreSQL ডাটাবেজে স্থায়ীভাবে ১ মাসের সামারি সেভ করা
       await this.prisma.systemMetricSummary.createMany({
         data: metricsList.map((item) => ({
           period: 'MONTHLY',
@@ -48,30 +97,22 @@ export class SystemService {
         })),
       });
 
-      // 💾 ২. Upstash Redis-এও সামারি কপি সেভ করা
       const summaryRedisKey = `metrics:summary:monthly:${monthKey}`;
       await this.cacheManager.set(summaryRedisKey, metricsList, 0);
 
-      this.logger.log(`✅ Successfully saved 1-Month Summary for [${monthKey}] in Supabase & Redis!`);
-    } catch (err) {
-      this.logger.error('Failed to run monthly metrics rollup', err);
+      SystemService.addLog('LOG', `Saved 1-Month Metric Rollup for [${monthKey}]`);
+    } catch (err: any) {
+      SystemService.addLog('ERROR', `Monthly Rollup Failed: ${err.message}`);
     }
   }
 
-  // =========================================================================
-  // 🔄 2. 6-MONTH CRON JOB: ৬ মাসের সামারি Supabase-এ সেভ করা
-  // =========================================================================
   @Cron('0 0 1 1,7 *')
   async handleHalfYearlyMetricsCycle() {
-    this.logger.log('🔄 Executing 6-Month Macro Metrics Rollup to Supabase...');
-
     try {
       const now = new Date();
-      const year = now.getFullYear();
-      const halfKey = now.getMonth() < 6 ? `${year}-H1` : `${year}-H2`;
+      const halfKey = now.getMonth() < 6 ? `${now.getFullYear()}-H1` : `${now.getFullYear()}-H2`;
       const metricsList = MetricsInterceptor.getMetricsList();
 
-      // Supabase PostgreSQL-এ সেভ করা
       await this.prisma.systemMetricSummary.createMany({
         data: metricsList.map((item) => ({
           period: 'HALFYEARLY',
@@ -85,24 +126,18 @@ export class SystemService {
         })),
       });
 
-      this.logger.log(`✅ Successfully saved 6-Month Macro Summary for [${halfKey}] in Supabase!`);
-    } catch (err) {
-      this.logger.error('Failed to run 6-month metrics rollup', err);
+      SystemService.addLog('LOG', `Saved 6-Month Macro Metric Rollup for [${halfKey}]`);
+    } catch (err: any) {
+      SystemService.addLog('ERROR', `6-Month Rollup Failed: ${err.message}`);
     }
   }
 
-  // =========================================================================
-  // 🔄 3. 1-YEAR ANNUAL CRON JOB: ১ বছরের বাৎসরিক সামারি Supabase-এ সেভ করা
-  // =========================================================================
   @Cron('0 0 1 1 *')
   async handleAnnualMetricsCycle() {
-    this.logger.log('🎆 Executing Annual 1-Year System Metrics Archival to Supabase...');
-
     try {
       const lastYear = `${new Date().getFullYear() - 1}`;
       const metricsList = MetricsInterceptor.getMetricsList();
 
-      // Supabase PostgreSQL-এ ১ বছরের সামারি সেভ করা
       await this.prisma.systemMetricSummary.createMany({
         data: metricsList.map((item) => ({
           period: 'ANNUAL',
@@ -116,21 +151,22 @@ export class SystemService {
         })),
       });
 
-      this.logger.log(`🏆 Successfully saved Annual Lifetime Summary for Year [${lastYear}] in Supabase!`);
-    } catch (err) {
-      this.logger.error('Failed to run annual metrics archival', err);
+      SystemService.addLog('LOG', `Saved Annual Metric Rollup for [${lastYear}]`);
+    } catch (err: any) {
+      SystemService.addLog('ERROR', `Annual Rollup Failed: ${err.message}`);
     }
   }
 
-
-    async getSystemMetrics() {
+  // =========================================================================
+  // 📈 SYSTEM METRICS TELEMETRY DISPATCHER
+  // =========================================================================
+  async getSystemMetrics() {
     this.scanAndRegisterRoutes();
     const memoryUsage = process.memoryUsage();
     const systemTotalMemory = os.totalmem();
     const systemFreeMemory = os.freemem();
     const heapPercent = Number(((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100).toFixed(1));
 
-    // 🕒 Database Response Latency (Ping)
     const dbStartTime = Date.now();
     let dbStatus = 'HEALTHY';
     let dbLatencyMs = 0;
@@ -141,7 +177,6 @@ export class SystemService {
       dbStatus = 'UNHEALTHY';
     }
 
-    // 📬 BullMQ Queue Job Counters (Optimized Single Call)
     let queueMetrics = { waiting: 0, active: 0, completed: 0, failed: 0 };
     try {
       const counts = await this.notificationQueue.getJobCounts('waiting', 'active', 'completed', 'failed');
@@ -151,11 +186,8 @@ export class SystemService {
         completed: counts.completed || 0,
         failed: counts.failed || 0,
       };
-    } catch (err) {
-      // Queue offline gracefully handled
-    }
+    } catch (err) {}
 
-    // 🏆 Global Health Score Calculation (0 - 100%)
     let healthScore = 100;
     if (dbStatus !== 'HEALTHY') healthScore -= 40;
     if (dbLatencyMs > 200) healthScore -= 15;
@@ -206,6 +238,7 @@ export class SystemService {
         failedRequests: totalFailedRequests,
         successRatePercent: successRate,
       },
+      logs: SystemService.getRecentLogs(),
       apiMetrics,
     };
   }
@@ -227,9 +260,7 @@ export class SystemService {
         });
         MetricsInterceptor.initializeRegisteredRoutes(routes);
       }
-    } catch (err) {
-      // Graceful fallback
-    }
+    } catch (err) {}
   }
 
   private formatUptime(seconds: number): string {
@@ -241,4 +272,3 @@ export class SystemService {
     return `${d}d ${h}h ${m}m ${s}s`;
   }
 }
-

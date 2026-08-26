@@ -59,6 +59,12 @@ let SystemController = class SystemController {
     getSystemStatus() {
         return this.systemService.getSystemMetrics();
     }
+    clearCache() {
+        return this.systemService.clearSystemCache('ALL');
+    }
+    retryQueue() {
+        return this.systemService.retryFailedQueueJobs();
+    }
     getDashboardUi() {
         return this.readFile('dashboard.html');
     }
@@ -72,8 +78,8 @@ let SystemController = class SystemController {
         return this.readFile('dashboard.js');
     }
     readFile(fileName) {
-        const distPath = path.join(__dirname, 'dashborad_ui', fileName);
         const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashborad_ui', fileName);
+        const distPath = path.join(__dirname, 'dashborad_ui', fileName);
         const filePath = fs.existsSync(srcPath) ? srcPath : distPath;
         return fs.readFileSync(filePath, 'utf8');
     }
@@ -87,6 +93,20 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], SystemController.prototype, "getSystemStatus", null);
+__decorate([
+    (0, common_1.Post)('cache/clear'),
+    (0, swagger_1.ApiOperation)({ summary: 'Manually invalidate system Redis caches' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], SystemController.prototype, "clearCache", null);
+__decorate([
+    (0, common_1.Post)('queue/retry'),
+    (0, swagger_1.ApiOperation)({ summary: 'Retry failed BullMQ queue jobs' }),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], SystemController.prototype, "retryQueue", null);
 __decorate([
     (0, common_1.Get)('dashboard'),
     (0, common_1.Header)('Content-Type', 'text/html'),

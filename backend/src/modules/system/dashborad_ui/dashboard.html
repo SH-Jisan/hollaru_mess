@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meal Book - Enterprise Observability & System Intelligence</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/system/dashboard.css?v=5">
+  <link rel="stylesheet" href="/system/dashboard.css?v=6">
 </head>
 <body>
   <!-- Header Bar -->
@@ -22,6 +22,18 @@
       <button class="btn-action" onclick="fetchMetrics()">🔄 Refresh Metrics</button>
       <button class="btn-action btn-primary" onclick="exportMetricsJson()">📥 Export JSON Report</button>
       <div style="font-size: 12px; color: var(--text-muted);">Mode: <strong style="color:var(--success);">⚡ Real-Time SSE Stream (0ms)</strong></div>
+    </div>
+  </div>
+
+  <!-- Quick Operations Control Action Bar -->
+  <div class="ops-bar">
+    <div style="font-size:13px; font-weight:700; color:#fff; display:flex; align-items:center; gap:8px;">
+      <span>🛠️ Operations Control & Cache Management:</span>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn-ops" onclick="triggerClearCache()">🧹 Flush Redis Cache</button>
+      <button class="btn-ops" onclick="triggerRetryQueue()">🔄 Retry Failed Jobs</button>
+      <button class="btn-ops" onclick="openSandboxModal('GET', '/system/status')">⚡ Open API Sandbox</button>
     </div>
   </div>
 
@@ -108,15 +120,38 @@
     </div>
   </div>
 
+  <!-- Live Terminal Log Streamer Console -->
+  <div class="terminal-container">
+    <div class="terminal-header">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="display:flex; gap:6px;">
+          <span style="width:10px; height:10px; background:#ef4444; border-radius:50%; inline-block;"></span>
+          <span style="width:10px; height:10px; background:#f59e0b; border-radius:50%; inline-block;"></span>
+          <span style="width:10px; height:10px; background:#10b981; border-radius:50%; inline-block;"></span>
+        </div>
+        <span style="font-size:13px; font-weight:700; color:#cbd5e1; font-family:'JetBrains Mono', monospace;">💻 Live NestJS Server Telemetry & Audit Streamer</span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="terminal-btn active" onclick="filterLogs('ALL', this)">ALL</button>
+        <button class="terminal-btn" onclick="filterLogs('LOG', this)">LOG</button>
+        <button class="terminal-btn" onclick="filterLogs('WARN', this)">WARN</button>
+        <button class="terminal-btn" onclick="filterLogs('ERROR', this)">ERROR</button>
+        <button class="terminal-btn" onclick="clearTerminalLogs()">🧹 Clear Console</button>
+      </div>
+    </div>
+    <div class="terminal-body" id="terminalLogs">
+      <div class="log-row log-LOG">[System] System Observability Console Ready</div>
+    </div>
+  </div>
+
   <!-- Swagger Style API Metrics Engine Header & Controls -->
-  <div class="controls-bar">
+  <div class="controls-bar" style="margin-top:28px;">
     <div>
       <div style="font-size: 16px; font-weight: 800; color: #fff;">⚡ Per-Route API Telemetry Engine (Swagger Accordion View)</div>
       <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Click any endpoint to expand real-time latency trends, memory usage, CPU time, and hit history</div>
     </div>
 
     <div class="filter-controls">
-      <!-- Method Filter Pills -->
       <div class="method-pills">
         <button class="pill active" onclick="filterByMethod('ALL', this)">ALL</button>
         <button class="pill pill-GET" onclick="filterByMethod('GET', this)">GET</button>
@@ -125,7 +160,6 @@
         <button class="pill pill-DELETE" onclick="filterByMethod('DELETE', this)">DELETE</button>
       </div>
 
-      <!-- Sort Controls -->
       <select id="sortSelect" class="select-box" onchange="applySorting()">
         <option value="calls">Sort by: Total Calls (High → Low)</option>
         <option value="latency">Sort by: Avg Latency (Slow → Fast)</option>
@@ -133,7 +167,6 @@
         <option value="recent">Sort by: Recently Hit</option>
       </select>
 
-      <!-- Search Input -->
       <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search API Route..." onkeyup="filterRoutes()">
     </div>
   </div>
@@ -143,6 +176,37 @@
     <div style="text-align:center; padding:40px; color:var(--text-muted);">Loading API endpoints...</div>
   </div>
 
-  <script src="/system/dashboard.js?v=5" defer></script>
+  <!-- Interactive API Sandbox Modal (Postman in Dashboard) -->
+  <div class="modal-overlay" id="sandboxModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div style="font-weight:700; font-size:15px; color:#fff;" id="modalRouteTitle">⚡ API Test Sandbox</div>
+        <button class="modal-close" onclick="closeSandboxModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <select id="modalMethod" class="select-box" style="width:100px;">
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PATCH">PATCH</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+          <input type="text" id="modalUrl" class="search-box" style="flex:1;" value="/system/status">
+          <button class="btn-action btn-primary" onclick="executeApiTest()">🚀 Send Request</button>
+        </div>
+
+        <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Request Payload (JSON):</div>
+        <textarea id="modalBody" class="modal-textarea" placeholder="{}"></textarea>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; margin-bottom:6px;">
+          <div style="font-size:11px; color:var(--text-muted);">Response Payload:</div>
+          <div style="font-size:12px; font-weight:700; color:#34d399;" id="testStatusTag">Ready</div>
+        </div>
+        <pre id="modalResponse" class="modal-response">// Click Send Request to execute endpoint</pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="/system/dashboard.js?v=6" defer></script>
 </body>
 </html>

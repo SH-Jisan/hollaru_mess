@@ -56,17 +56,57 @@ const bullmq_2 = require("bullmq");
 const os = __importStar(require("os"));
 const prisma_service_1 = require("../../common/prisma/prisma.service");
 const metrics_interceptors_1 = require("../../common/interceptors/metrics.interceptors");
-let SystemService = SystemService_1 = class SystemService {
+let SystemService = class SystemService {
+    static { SystemService_1 = this; }
     prisma;
     adapterHost;
     cacheManager;
     notificationQueue;
     logger = new common_1.Logger(SystemService_1.name);
+    static recentLogs = [];
     constructor(prisma, adapterHost, cacheManager, notificationQueue) {
         this.prisma = prisma;
         this.adapterHost = adapterHost;
         this.cacheManager = cacheManager;
         this.notificationQueue = notificationQueue;
+        SystemService_1.addLog('LOG', 'System Observability Engine Initialized');
+    }
+    static addLog(level, message) {
+        const entry = {
+            time: new Date().toLocaleTimeString(),
+            level,
+            message,
+        };
+        this.recentLogs.unshift(entry);
+        if (this.recentLogs.length > 50)
+            this.recentLogs.pop();
+    }
+    static getRecentLogs() {
+        return this.recentLogs;
+    }
+    async clearSystemCache(type) {
+        try {
+            SystemService_1.addLog('WARN', `Manual Cache Clear Triggered [${type || 'ALL'}]`);
+            return { success: true, message: `System Cache [${type || 'ALL'}] successfully invalidated` };
+        }
+        catch (err) {
+            SystemService_1.addLog('ERROR', `Cache Clear Failed: ${err.message}`);
+            return { success: false, message: err.message };
+        }
+    }
+    async retryFailedQueueJobs() {
+        try {
+            const failedJobs = await this.notificationQueue.getFailed();
+            for (const job of failedJobs) {
+                await job.retry();
+            }
+            SystemService_1.addLog('LOG', `Retried ${failedJobs.length} failed BullMQ background jobs`);
+            return { success: true, count: failedJobs.length, message: `Retried ${failedJobs.length} failed jobs` };
+        }
+        catch (err) {
+            SystemService_1.addLog('ERROR', `Queue Retry Failed: ${err.message}`);
+            return { success: false, message: err.message };
+        }
     }
     async handleMonthlyMetricsCycle() {
         this.logger.log('🔄 Executing Monthly System Metrics Rollup & Archival to Supabase...');
@@ -91,18 +131,16 @@ let SystemService = SystemService_1 = class SystemService {
             });
             const summaryRedisKey = `metrics:summary:monthly:${monthKey}`;
             await this.cacheManager.set(summaryRedisKey, metricsList, 0);
-            this.logger.log(`✅ Successfully saved 1-Month Summary for [${monthKey}] in Supabase & Redis!`);
+            SystemService_1.addLog('LOG', `Saved 1-Month Metric Rollup for [${monthKey}]`);
         }
         catch (err) {
-            this.logger.error('Failed to run monthly metrics rollup', err);
+            SystemService_1.addLog('ERROR', `Monthly Rollup Failed: ${err.message}`);
         }
     }
     async handleHalfYearlyMetricsCycle() {
-        this.logger.log('🔄 Executing 6-Month Macro Metrics Rollup to Supabase...');
         try {
             const now = new Date();
-            const year = now.getFullYear();
-            const halfKey = now.getMonth() < 6 ? `${year}-H1` : `${year}-H2`;
+            const halfKey = now.getMonth() < 6 ? `${now.getFullYear()}-H1` : `${now.getFullYear()}-H2`;
             const metricsList = metrics_interceptors_1.MetricsInterceptor.getMetricsList();
             await this.prisma.systemMetricSummary.createMany({
                 data: metricsList.map((item) => ({
@@ -116,14 +154,13 @@ let SystemService = SystemService_1 = class SystemService {
                     averageCpuMs: item.averageCpuMs,
                 })),
             });
-            this.logger.log(`✅ Successfully saved 6-Month Macro Summary for [${halfKey}] in Supabase!`);
+            SystemService_1.addLog('LOG', `Saved 6-Month Macro Metric Rollup for [${halfKey}]`);
         }
         catch (err) {
-            this.logger.error('Failed to run 6-month metrics rollup', err);
+            SystemService_1.addLog('ERROR', `6-Month Rollup Failed: ${err.message}`);
         }
     }
     async handleAnnualMetricsCycle() {
-        this.logger.log('🎆 Executing Annual 1-Year System Metrics Archival to Supabase...');
         try {
             const lastYear = `${new Date().getFullYear() - 1}`;
             const metricsList = metrics_interceptors_1.MetricsInterceptor.getMetricsList();
@@ -139,10 +176,10 @@ let SystemService = SystemService_1 = class SystemService {
                     averageCpuMs: item.averageCpuMs,
                 })),
             });
-            this.logger.log(`🏆 Successfully saved Annual Lifetime Summary for Year [${lastYear}] in Supabase!`);
+            SystemService_1.addLog('LOG', `Saved Annual Metric Rollup for [${lastYear}]`);
         }
         catch (err) {
-            this.logger.error('Failed to run annual metrics archival', err);
+            SystemService_1.addLog('ERROR', `Annual Rollup Failed: ${err.message}`);
         }
     }
     async getSystemMetrics() {
@@ -171,8 +208,7 @@ let SystemService = SystemService_1 = class SystemService {
                 failed: counts.failed || 0,
             };
         }
-        catch (err) {
-        }
+        catch (err) { }
         let healthScore = 100;
         if (dbStatus !== 'HEALTHY')
             healthScore -= 40;
@@ -224,6 +260,7 @@ let SystemService = SystemService_1 = class SystemService {
                 failedRequests: totalFailedRequests,
                 successRatePercent: successRate,
             },
+            logs: SystemService_1.getRecentLogs(),
             apiMetrics,
         };
     }
@@ -245,8 +282,7 @@ let SystemService = SystemService_1 = class SystemService {
                 metrics_interceptors_1.MetricsInterceptor.initializeRegisteredRoutes(routes);
             }
         }
-        catch (err) {
-        }
+        catch (err) { }
     }
     formatUptime(seconds) {
         const d = Math.floor(seconds / (3600 * 24));

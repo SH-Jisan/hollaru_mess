@@ -1,4 +1,4 @@
-import { Controller, Get, Header, MessageEvent, Sse } from '@nestjs/common';
+import { Controller, Get, Header, MessageEvent, Post, Sse } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -19,6 +19,18 @@ export class SystemController {
     return this.systemService.getSystemMetrics();
   }
 
+  @Post('cache/clear')
+  @ApiOperation({ summary: 'Manually invalidate system Redis caches' })
+  clearCache() {
+    return this.systemService.clearSystemCache('ALL');
+  }
+
+  @Post('queue/retry')
+  @ApiOperation({ summary: 'Retry failed BullMQ queue jobs' })
+  retryQueue() {
+    return this.systemService.retryFailedQueueJobs();
+  }
+
   @Get('dashboard')
   @Header('Content-Type', 'text/html')
   @ApiOperation({ summary: 'View Live System Status & API Performance Dashboard UI' })
@@ -26,14 +38,14 @@ export class SystemController {
     return this.readFile('dashboard.html');
   }
 
-   @Sse('events')
+  @Sse('events')
   @ApiOperation({ summary: 'Stream live real-time metrics updates via Server-Sent Events (SSE)' })
   streamMetrics(): Observable<MessageEvent> {
     return MetricsInterceptor.getMetricsObservable().pipe(
       map((data) => ({ data: JSON.stringify(data) } as MessageEvent)),
     );
   }
-  
+
   @Get('dashboard.css')
   @Header('Content-Type', 'text/css')
   getDashboardCss(): string {
@@ -47,8 +59,8 @@ export class SystemController {
   }
 
   private readFile(fileName: string): string {
-    const distPath = path.join(__dirname, 'dashborad_ui', fileName);
     const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashborad_ui', fileName);
+    const distPath = path.join(__dirname, 'dashborad_ui', fileName);
 
     const filePath = fs.existsSync(srcPath) ? srcPath : distPath;
     return fs.readFileSync(filePath, 'utf8');

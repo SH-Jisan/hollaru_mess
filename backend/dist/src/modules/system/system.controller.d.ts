@@ -48,7 +48,21 @@ export declare class SystemController {
             failedRequests: number;
             successRatePercent: number;
         };
+        logs: import("./system.service").LogEntry[];
         apiMetrics: import("../../common/interceptors/metrics.interceptors").RouteMetric[];
+    }>;
+    clearCache(): Promise<{
+        success: boolean;
+        message: any;
+    }>;
+    retryQueue(): Promise<{
+        success: boolean;
+        count: number;
+        message: string;
+    } | {
+        success: boolean;
+        message: any;
+        count?: undefined;
     }>;
     getDashboardUi(): string;
     streamMetrics(): Observable<MessageEvent>;

@@ -3,9 +3,11 @@ let rawMetrics = [];
 let selectedMethod = 'ALL';
 let memoryHistory = { labels: [], heap: [], rss: [] };
 let routeHistoryMap = new Map();
+let systemLogs = [];
+let selectedLogLevel = 'ALL';
 
 // =========================================================================
-// 🎨 Standalone Enterprise Native HTML5 Canvas Engine (0 External Dependencies)
+// 🎨 Enterprise Native HTML5 Canvas Engine (0 External Dependencies)
 // =========================================================================
 function drawNativeChart(canvasId, labels, datasets, options = {}) {
   const canvas = document.getElementById(canvasId);
@@ -32,7 +34,6 @@ function drawNativeChart(canvasId, labels, datasets, options = {}) {
     return;
   }
 
-  // Calculate min & max Y values
   let allValues = [];
   datasets.forEach((ds) => allValues.push(...ds.data));
   let maxVal = Math.max(...allValues, 1);
@@ -42,7 +43,6 @@ function drawNativeChart(canvasId, labels, datasets, options = {}) {
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
-  // Draw Grid Lines & Y-Axis Scale
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
   ctx.lineWidth = 1;
   ctx.fillStyle = '#94a3b8';
@@ -62,7 +62,6 @@ function drawNativeChart(canvasId, labels, datasets, options = {}) {
     ctx.fillText(val + (options.unit || ''), padding.left - 6, y + 3);
   }
 
-  // Render Datasets
   datasets.forEach((ds) => {
     if (!ds.data || ds.data.length === 0) return;
 
@@ -73,7 +72,6 @@ function drawNativeChart(canvasId, labels, datasets, options = {}) {
       return { x, y, val };
     });
 
-    // Fill Gradient under area
     if (ds.fillColor && points.length > 1) {
       const grad = ctx.createLinearGradient(0, padding.top, 0, height - padding.bottom);
       grad.addColorStop(0, ds.fillColor);
@@ -91,7 +89,6 @@ function drawNativeChart(canvasId, labels, datasets, options = {}) {
       ctx.fill();
     }
 
-    // Draw Smooth Connecting Line
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) {
@@ -104,7 +101,6 @@ function drawNativeChart(canvasId, labels, datasets, options = {}) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw Glowing Data Nodes
     points.forEach((pt) => {
       ctx.beginPath();
       ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
@@ -113,7 +109,6 @@ function drawNativeChart(canvasId, labels, datasets, options = {}) {
     });
   });
 
-  // Draw X-Axis Timestamps
   ctx.fillStyle = '#94a3b8';
   ctx.font = '10px Inter, sans-serif';
   ctx.textAlign = 'center';
@@ -134,7 +129,7 @@ function renderMemoryChart() {
 }
 
 // =========================================================================
-// 🔄 Real-Time Telemetry Fetcher & Analytics Insights
+// 🔄 Real-Time Telemetry Fetcher & Log Streamer
 // =========================================================================
 async function fetchMetrics() {
   try {
@@ -144,7 +139,7 @@ async function fetchMetrics() {
 
     if (!data || !data.uptime) return;
 
-    // 1. Update Key Performance Indicator Cards
+    // 1. Top Indicator Cards
     if (document.getElementById('healthScoreVal')) {
       const score = data.healthScore !== undefined ? data.healthScore : 100;
       document.getElementById('healthScoreVal').innerText = score + '%';
@@ -187,16 +182,13 @@ async function fetchMetrics() {
     if (data.database && document.getElementById('dbLatencyVal')) {
       document.getElementById('dbLatencyVal').innerText = data.database.latencyMs || '0 ms';
     }
-    if (data.database && document.getElementById('dbStatusVal')) {
-      document.getElementById('dbStatusVal').innerText = 'Supabase Status: ' + (data.database.status || 'HEALTHY');
-    }
 
     if (data.queue) {
       document.getElementById('queueActiveVal').innerText = data.queue.active + ' Active';
       document.getElementById('queueSubVal').innerText = `Waiting: ${data.queue.waiting} | Failed: ${data.queue.failed} | Done: ${data.queue.completed}`;
     }
 
-    // 2. Memory Trend & Leak Detector
+    // 2. Memory Leak Detector
     const timeLabel = new Date().toLocaleTimeString();
     if (data.memory) {
       memoryHistory.labels.push(timeLabel);
@@ -210,7 +202,6 @@ async function fetchMetrics() {
       }
       renderMemoryChart();
 
-      // Memory Leak Detector Logic
       const isLeaking = memoryHistory.heap.length >= 10 && memoryHistory.heap.slice(-5).every((v, i, arr) => i === 0 || v > arr[i - 1]);
       const leakBadge = document.getElementById('memLeakStatus');
       if (leakBadge) {
@@ -228,7 +219,13 @@ async function fetchMetrics() {
       }
     }
 
-    // 3. Update API Endpoint Metrics List & Compute Telemetry Insights
+    // 3. Render Logs
+    if (data.logs && Array.isArray(data.logs)) {
+      systemLogs = data.logs;
+      renderTerminalLogs();
+    }
+
+    // 4. Update Insights & Routes
     rawMetrics = data.apiMetrics || [];
     updateInsightsPanel(rawMetrics);
     updateRouteHistory(rawMetrics, timeLabel);
@@ -239,25 +236,112 @@ async function fetchMetrics() {
   }
 }
 
-// Compute Insights (Fastest, Slowest, P95, Total Errors)
+// Terminal Log Renderer
+function renderTerminalLogs() {
+  const container = document.getElementById('terminalLogs');
+  if (!container) return;
+
+  const filtered = systemLogs.filter((l) => selectedLogLevel === 'ALL' || l.level === selectedLogLevel);
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted);">No logs matching filter.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered
+    .map((l) => `<div class="log-row log-${l.level}">[${l.time}] [${l.level}] ${l.message}</div>`)
+    .join('');
+}
+
+function filterLogs(level, btnEl) {
+  selectedLogLevel = level;
+  document.querySelectorAll('.terminal-btn').forEach((b) => b.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+  renderTerminalLogs();
+}
+
+function clearTerminalLogs() {
+  systemLogs = [];
+  renderTerminalLogs();
+}
+
+// Manual Cache & Queue Actions
+async function triggerClearCache() {
+  try {
+    const res = await fetch('/system/cache/clear', { method: 'POST' });
+    const json = await res.json();
+    alert('🧹 Cache Cleared: ' + (json.message || 'System Redis Cache Invalidated'));
+    fetchMetrics();
+  } catch (err) {
+    alert('Failed to clear cache');
+  }
+}
+
+async function triggerRetryQueue() {
+  try {
+    const res = await fetch('/system/queue/retry', { method: 'POST' });
+    const json = await res.json();
+    alert('🔄 Queue Retried: ' + (json.message || 'BullMQ Jobs Retried'));
+    fetchMetrics();
+  } catch (err) {
+    alert('Failed to retry queue');
+  }
+}
+
+// API Test Sandbox Modal (Postman in Dashboard)
+function openSandboxModal(method, url) {
+  document.getElementById('modalMethod').value = method || 'GET';
+  document.getElementById('modalUrl').value = url || '/system/status';
+  document.getElementById('modalRouteTitle').innerText = `⚡ Sandbox Tester: ${method || 'GET'} ${url || ''}`;
+  document.getElementById('modalBody').value = method === 'GET' ? '{}' : '{\n  "key": "value"\n}';
+  document.getElementById('modalResponse').innerText = '// Click Send Request to execute endpoint';
+  document.getElementById('sandboxModal').classList.add('active');
+}
+
+function closeSandboxModal() {
+  document.getElementById('sandboxModal').classList.remove('active');
+}
+
+async function executeApiTest() {
+  const method = document.getElementById('modalMethod').value;
+  const url = document.getElementById('modalUrl').value;
+  const bodyText = document.getElementById('modalBody').value;
+  const responseBox = document.getElementById('modalResponse');
+  const statusTag = document.getElementById('testStatusTag');
+
+  statusTag.innerText = '⚡ Testing...';
+  statusTag.style.color = '#f59e0b';
+
+  const startTime = Date.now();
+  try {
+    const options = { method, headers: { 'Content-Type': 'application/json' } };
+    if (method !== 'GET' && bodyText.trim()) {
+      options.body = bodyText;
+    }
+
+    const res = await fetch(url, options);
+    const latency = Date.now() - startTime;
+    const json = await res.json();
+
+    statusTag.innerText = `✅ ${res.status} ${res.statusText} (${latency} ms)`;
+    statusTag.style.color = res.status < 400 ? '#34d399' : '#f87171';
+    responseBox.innerText = JSON.stringify(json, null, 2);
+  } catch (err) {
+    statusTag.innerText = '❌ Request Failed';
+    statusTag.style.color = '#f87171';
+    responseBox.innerText = 'Error: ' + err.message;
+  }
+}
+
 function updateInsightsPanel(metrics) {
   if (!metrics || metrics.length === 0) return;
 
   const hitMetrics = metrics.filter((m) => m.totalRequests > 0);
-  if (hitMetrics.length === 0) {
-    if (document.getElementById('fastestRouteVal')) document.getElementById('fastestRouteVal').innerText = '--';
-    if (document.getElementById('slowestRouteVal')) document.getElementById('slowestRouteVal').innerText = '--';
-    if (document.getElementById('p95LatencyVal')) document.getElementById('p95LatencyVal').innerText = '0 ms';
-    if (document.getElementById('totalErrorsVal')) document.getElementById('totalErrorsVal').innerText = '0 Errors';
-    return;
-  }
+  if (hitMetrics.length === 0) return;
 
-  // Sorted by average latency
   const sorted = [...hitMetrics].sort((a, b) => a.averageLatencyMs - b.averageLatencyMs);
   const fastest = sorted[0];
   const slowest = sorted[sorted.length - 1];
 
-  const totalHits = hitMetrics.reduce((sum, m) => sum + m.totalRequests, 0);
   const totalErrors = metrics.reduce((sum, m) => sum + m.failedRequests, 0);
   const avgLatencyOverall = Number((hitMetrics.reduce((sum, m) => sum + m.averageLatencyMs, 0) / hitMetrics.length).toFixed(2));
 
@@ -350,6 +434,7 @@ function renderAccordionList(metrics) {
             <span class="route-path">${m.path}</span>
           </div>
           <div class="accordion-right">
+            <button class="btn-ops" style="padding:2px 8px; font-size:11px;" onclick="event.stopPropagation(); openSandboxModal('${m.method}', '${m.path}')">🚀 Test</button>
             <span style="font-size:12px; color:var(--text-muted);">Calls: <strong style="color:#fff;" id="calls-${safeKey}">${m.totalRequests}</strong></span>
             <span class="latency-tag ${latClass}" id="latTag-${safeKey}">⚡ Avg: ${m.averageLatencyMs} ms</span>
             <span class="chevron">▼</span>
@@ -451,7 +536,7 @@ function exportMetricsJson() {
   downloadAnchor.remove();
 }
 
-// Real-Time Server-Sent Events (SSE) Stream Setup
+// Real-Time SSE Setup
 const eventSource = new EventSource('/system/events');
 
 eventSource.onopen = () => {
@@ -475,9 +560,7 @@ eventSource.onmessage = (event) => {
       renderAccordionList(rawMetrics);
       updateRouteCharts();
     }
-  } catch (err) {
-    console.error('SSE Live Metric Parse Error:', err);
-  }
+  } catch (err) {}
 };
 
 window.addEventListener('resize', () => {
