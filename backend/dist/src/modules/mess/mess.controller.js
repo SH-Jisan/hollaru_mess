@@ -16,9 +16,13 @@ exports.MessController = void 0;
 const common_1 = require("@nestjs/common");
 const swagger_1 = require("@nestjs/swagger");
 const user_decorator_1 = require("../../common/decorators/user.decorator");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
+const roles_guard_1 = require("../../common/guards/roles.guard");
+const client_1 = require("@prisma/client");
 const create_mess_dto_1 = require("./dto/create-mess.dto");
 const join_mess_dto_1 = require("./dto/join-mess.dto");
+const transfer_manager_dto_1 = require("./dto/transfer-manager.dto");
 const mess_service_1 = require("./mess.service");
 let MessController = class MessController {
     messService;
@@ -36,6 +40,9 @@ let MessController = class MessController {
     }
     leaveMess(user) {
         return this.messService.leaveMess(user.id);
+    }
+    transferManager(dto, user) {
+        return this.messService.transferManager(dto, user.id);
     }
 };
 exports.MessController = MessController;
@@ -79,6 +86,18 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], MessController.prototype, "leaveMess", null);
+__decorate([
+    (0, common_1.Post)('transfer-manager'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(client_1.Role.MANAGER),
+    (0, swagger_1.ApiOperation)({ summary: 'Transfer manager ownership to another member (Manager Only)' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Manager transferred successfully & notification sent to all members.' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [transfer_manager_dto_1.TransferManagerDto, Object]),
+    __metadata("design:returntype", void 0)
+], MessController.prototype, "transferManager", null);
 exports.MessController = MessController = __decorate([
     (0, swagger_1.ApiTags)('Mess Management'),
     (0, swagger_1.ApiBearerAuth)(),

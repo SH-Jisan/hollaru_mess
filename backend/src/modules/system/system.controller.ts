@@ -50,7 +50,7 @@ export class SystemController {
     const distPath = path.join(__dirname, 'dashborad_ui', fileName);
     const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashborad_ui', fileName);
 
-    const filePath = fs.existsSync(distPath) ? distPath : srcPath;
+    const filePath = fs.existsSync(srcPath) ? srcPath : distPath;
     return fs.readFileSync(filePath, 'utf8');
   }
 }

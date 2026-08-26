@@ -1,12 +1,15 @@
 import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { InjectQueue } from '@nestjs/bullmq';
 import type { Cache } from 'cache-manager';
+import { Queue } from 'bullmq';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { MessCodeNotFoundException } from '../../common/exceptions/domain.exception';
 import { CreateMessDto } from './dto/create-mess.dto';
 import { JoinMessDto } from './dto/join-mess.dto';
+import { TransferManagerDto } from './dto/transfer-manager.dto';
 import { AuthService } from '../auth/auth.service';
 
 @Injectable()
@@ -16,6 +19,7 @@ export class MessService {
     private validator: ContextValidatorService,
     private authService: AuthService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    @InjectQueue('notification-queue') private notificationQueue: Queue,
   ) { }
 
   // ১. নতুন মেস তৈরি করা
@@ -154,24 +158,78 @@ export class MessService {
         messId: null,
         role: Role.MEMBER,
         joinedAt: null,
+        leftAt: new Date(),
       },
     });
 
     // ⚡ ২. মেম্বার লিস্টের ক্যাশ এবং ইউজারের ক্যাশ মুছে দেওয়া
     const memberCacheKey = `mess:${mess.id}:members`;
+    const billingCacheKey = mess.currentMonthId ? `billing:${mess.id}:${mess.currentMonthId}:summary` : null;
     try {
       await Promise.all([
         this.cacheManager.del(memberCacheKey),
         this.cacheManager.del(`auth:user:${user.email}`),
+        billingCacheKey ? this.cacheManager.del(billingCacheKey) : Promise.resolve(),
       ]);
     } catch (err) {}
 
     // ⚡ ৩. মেস ছাড়া অবস্থায় নতুন টোকেন ইস্যু করা (messId: null)
     const tokens = await this.authService.generateTokens(userId, user.email, Role.MEMBER);
     await this.authService.updateRefreshToken(userId, tokens.refreshToken);
+    
 
     return { message: 'Successfully left the mess', ...tokens };
   }
 
+  // ৫. মেস ম্যানেজার পরিবর্তন ও প্রমোট করা (Transfer Manager Ownership)
+  async transferManager(dto: TransferManagerDto, currentManagerId: string) {
+    const { manager, mess } = await this.validator.validateManager(currentManagerId);
+    if (dto.newManagerId === currentManagerId) {
+      throw new BadRequestException('You are already the manager of this mess.');
+    }
+    const newManager = await this.prisma.user.findUnique({
+      where: { id: dto.newManagerId },
+    });
+    if (!newManager || newManager.messId !== mess.id) {
+      throw new BadRequestException('The selected member does not belong to this mess.');
+    }
+    // ⚛️ ট্রানজেকশনে ম্যানেজার রোল সোয়াইপ করা
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: currentManagerId },
+        data: { role: Role.MEMBER },
+      });
+      await tx.user.update({
+        where: { id: dto.newManagerId },
+        data: { role: Role.MANAGER },
+      });
+      await tx.mess.update({
+        where: { id: mess.id },
+        data: { managerId: dto.newManagerId },
+      });
+    });
+    // ⚡ ক্যাশ মুছে দেওয়া
+    const memberCacheKey = `mess:${mess.id}:members`;
+    try {
+      await Promise.all([
+        this.cacheManager.del(memberCacheKey),
+        this.cacheManager.del(`auth:user:${manager.email}`),
+        this.cacheManager.del(`auth:user:${newManager.email}`),
+      ]);
+    } catch (err) {}
+    // 🔔 ব্যাকগ্রাউন্ড কিউতে মেসের সব মেম্বারদের ফোনে পুশ নোটিফিকেশন পাঠানো
+    const messMembers = await this.prisma.user.findMany({
+      where: { messId: mess.id },
+      select: { id: true },
+    });
+    for (const member of messMembers) {
+      await this.notificationQueue.add('send-user-notification', {
+        userId: member.id,
+        title: '👑 Manager Updated!',
+        body: `${newManager.name} is now the manager of ${mess.name}.`,
+      });
+    }
+    return { message: `Manager ownership successfully transferred to ${newManager.name}` };
+  }
   
 }

@@ -1,9 +1,13 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Role } from '@prisma/client';
 import { CreateMessDto } from './dto/create-mess.dto';
 import { JoinMessDto } from './dto/join-mess.dto';
+import { TransferManagerDto } from './dto/transfer-manager.dto';
 import { MessService } from './mess.service';
 
 @ApiTags('Mess Management')
@@ -43,4 +47,13 @@ export class MessController {
     return this.messService.leaveMess(user.id);
   }
 
+
+  @Post('transfer-manager')
+  @UseGuards(RolesGuard)
+  @Roles(Role.MANAGER)
+  @ApiOperation({ summary: 'Transfer manager ownership to another member (Manager Only)' })
+  @ApiResponse({ status: 200, description: 'Manager transferred successfully & notification sent to all members.' })
+  transferManager(@Body() dto: TransferManagerDto, @CurrentUser() user: { id: string }) {
+    return this.messService.transferManager(dto, user.id);
+  }
 }

@@ -39,6 +39,7 @@ model User {
   requests  MealRequest[]
   createdAt DateTime @default(now())
   joinedAt DateTime?
+  leftAt DateTime?
   fcmToken  String?
   notifications      Notification[] // 👈 ইন-অ্যাপ নোটিফিকেশনের রিলেশন
 }

@@ -81,16 +81,25 @@ let BillingService = class BillingService {
         const depositMap = new Map();
         depositsGrouped.forEach((dep) => depositMap.set(dep.userId, dep._sum.amount || 0));
         const members = await this.prisma.user.findMany({
-            where: { messId: user.messId },
-            select: { id: true, name: true, email: true },
+            where: {
+                OR: [
+                    { messId: user.messId },
+                    { deposits: { some: { monthId } } },
+                    { requests: { some: { log: { monthId } } } },
+                ],
+            },
+            select: { id: true, name: true, email: true, messId: true, leftAt: true },
         });
         const memberSummaries = members.map((member) => {
             const totalDeposit = depositMap.get(member.id) || 0;
+            const hasLeft = member.messId !== user.messId || !!member.leftAt;
             return {
                 memberId: member.id,
                 name: member.name,
                 email: member.email,
                 totalDeposit,
+                hasLeft,
+                leftAt: member.leftAt,
             };
         });
         const summaryResult = {

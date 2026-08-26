@@ -10,17 +10,21 @@ export interface Response<T> {
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<T, any> {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    const request = context.switchToHttp().getRequest();
     const response = context.switchToHttp().getResponse();
 
     return next.handle().pipe(
       map(data => {
+        const url = request.url || '';
         const contentType = response.getHeader('content-type') || '';
 
-        // 🟢 যদি Content-Type জেসন (JSON) না হয়ে স্ট্যাটিক ফাইল (HTML, CSS, JS) হয়, তবে ডাটা সরাসরি র-পাঠাবে
+        // 🟢 যদি সিস্টেম ড্যাশবোর্ড স্ট্যাটিক ফাইল (HTML, CSS, JS) বা SSE স্ট্রিম হয়, তবে র-ডাটা রিটার্ন করবে
         if (
-          typeof contentType === 'string' &&
-          contentType.length > 0 &&
-          !contentType.includes('application/json')
+          url.startsWith('/system/dashboard') ||
+          url.startsWith('/system/events') ||
+          (typeof contentType === 'string' &&
+            contentType.length > 0 &&
+            !contentType.includes('application/json'))
         ) {
           return data;
         }

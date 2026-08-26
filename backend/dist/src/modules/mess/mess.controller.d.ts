@@ -1,5 +1,6 @@
 import { CreateMessDto } from './dto/create-mess.dto';
 import { JoinMessDto } from './dto/join-mess.dto';
+import { TransferManagerDto } from './dto/transfer-manager.dto';
 import { MessService } from './mess.service';
 export declare class MessController {
     private readonly messService;
@@ -10,8 +11,9 @@ export declare class MessController {
         accessToken: string;
         refreshToken: string;
         mess: {
-            id: string;
             name: string;
+            id: string;
+            createdAt: Date;
             code: string;
             managerId: string;
             isMonthActive: boolean;
@@ -19,7 +21,6 @@ export declare class MessController {
             requestStartTime: string;
             lunchEndTime: string;
             dinnerEndTime: string;
-            createdAt: Date;
         };
     }>;
     joinMess(joinMessDto: JoinMessDto, user: {
@@ -38,6 +39,11 @@ export declare class MessController {
     }): Promise<{
         accessToken: string;
         refreshToken: string;
+        message: string;
+    }>;
+    transferManager(dto: TransferManagerDto, user: {
+        id: string;
+    }): Promise<{
         message: string;
     }>;
 }

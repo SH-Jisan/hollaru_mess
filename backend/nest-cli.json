@@ -3,6 +3,13 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "modules/system/dashborad_ui/**/*",
+        "outDir": "dist/modules/system/dashborad_ui",
+        "watchAssets": true
+      }
+    ]
   }
 }

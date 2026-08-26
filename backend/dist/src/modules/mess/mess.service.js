@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessService = void 0;
 const common_1 = require("@nestjs/common");
 const cache_manager_1 = require("@nestjs/cache-manager");
+const bullmq_1 = require("@nestjs/bullmq");
+const bullmq_2 = require("bullmq");
 const client_1 = require("@prisma/client");
 const prisma_service_1 = require("../../common/prisma/prisma.service");
 const context_validator_service_1 = require("../../common/services/context-validator.service");
@@ -25,11 +27,13 @@ let MessService = class MessService {
     validator;
     authService;
     cacheManager;
-    constructor(prisma, validator, authService, cacheManager) {
+    notificationQueue;
+    constructor(prisma, validator, authService, cacheManager, notificationQueue) {
         this.prisma = prisma;
         this.validator = validator;
         this.authService = authService;
         this.cacheManager = cacheManager;
+        this.notificationQueue = notificationQueue;
     }
     async createMess(dto, userId) {
         await this.validator.validateUserHasNoMess(userId);
@@ -130,13 +134,16 @@ let MessService = class MessService {
                 messId: null,
                 role: client_1.Role.MEMBER,
                 joinedAt: null,
+                leftAt: new Date(),
             },
         });
         const memberCacheKey = `mess:${mess.id}:members`;
+        const billingCacheKey = mess.currentMonthId ? `billing:${mess.id}:${mess.currentMonthId}:summary` : null;
         try {
             await Promise.all([
                 this.cacheManager.del(memberCacheKey),
                 this.cacheManager.del(`auth:user:${user.email}`),
+                billingCacheKey ? this.cacheManager.del(billingCacheKey) : Promise.resolve(),
             ]);
         }
         catch (err) { }
@@ -144,13 +151,61 @@ let MessService = class MessService {
         await this.authService.updateRefreshToken(userId, tokens.refreshToken);
         return { message: 'Successfully left the mess', ...tokens };
     }
+    async transferManager(dto, currentManagerId) {
+        const { manager, mess } = await this.validator.validateManager(currentManagerId);
+        if (dto.newManagerId === currentManagerId) {
+            throw new common_1.BadRequestException('You are already the manager of this mess.');
+        }
+        const newManager = await this.prisma.user.findUnique({
+            where: { id: dto.newManagerId },
+        });
+        if (!newManager || newManager.messId !== mess.id) {
+            throw new common_1.BadRequestException('The selected member does not belong to this mess.');
+        }
+        await this.prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: currentManagerId },
+                data: { role: client_1.Role.MEMBER },
+            });
+            await tx.user.update({
+                where: { id: dto.newManagerId },
+                data: { role: client_1.Role.MANAGER },
+            });
+            await tx.mess.update({
+                where: { id: mess.id },
+                data: { managerId: dto.newManagerId },
+            });
+        });
+        const memberCacheKey = `mess:${mess.id}:members`;
+        try {
+            await Promise.all([
+                this.cacheManager.del(memberCacheKey),
+                this.cacheManager.del(`auth:user:${manager.email}`),
+                this.cacheManager.del(`auth:user:${newManager.email}`),
+            ]);
+        }
+        catch (err) { }
+        const messMembers = await this.prisma.user.findMany({
+            where: { messId: mess.id },
+            select: { id: true },
+        });
+        for (const member of messMembers) {
+            await this.notificationQueue.add('send-user-notification', {
+                userId: member.id,
+                title: '👑 Manager Updated!',
+                body: `${newManager.name} is now the manager of ${mess.name}.`,
+            });
+        }
+        return { message: `Manager ownership successfully transferred to ${newManager.name}` };
+    }
 };
 exports.MessService = MessService;
 exports.MessService = MessService = __decorate([
     (0, common_1.Injectable)(),
     __param(3, (0, common_1.Inject)(cache_manager_1.CACHE_MANAGER)),
+    __param(4, (0, bullmq_1.InjectQueue)('notification-queue')),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         context_validator_service_1.ContextValidatorService,
-        auth_service_1.AuthService, Object])
+        auth_service_1.AuthService, Object, bullmq_2.Queue])
 ], MessService);
 //# sourceMappingURL=mess.service.js.map

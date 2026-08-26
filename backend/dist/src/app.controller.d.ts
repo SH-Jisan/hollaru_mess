@@ -23,6 +23,7 @@ export declare class AppController {
         messId: string | null;
         createdAt: Date;
         joinedAt: Date | null;
+        leftAt: Date | null;
         fcmToken: string | null;
     }, "hashedPassword" | "hashedRefreshToken">;
     getManagerData(user: {
