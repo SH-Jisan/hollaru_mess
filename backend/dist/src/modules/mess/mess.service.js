@@ -114,6 +114,36 @@ let MessService = class MessService {
         await this.cacheManager.set(cacheKey, members, 0);
         return members;
     }
+    async leaveMess(userId) {
+        const { user, mess } = await this.validator.validateUserAndMess(userId);
+        if (user.role === client_1.Role.MANAGER) {
+            const otherMemberCount = await this.prisma.user.count({
+                where: { messId: mess.id, id: { not: userId } },
+            });
+            if (otherMemberCount > 0) {
+                throw new common_1.BadRequestException('Managers cannot leave the mess while other members are still in the mess. Please transfer manager ownership first.');
+            }
+        }
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                messId: null,
+                role: client_1.Role.MEMBER,
+                joinedAt: null,
+            },
+        });
+        const memberCacheKey = `mess:${mess.id}:members`;
+        try {
+            await Promise.all([
+                this.cacheManager.del(memberCacheKey),
+                this.cacheManager.del(`auth:user:${user.email}`),
+            ]);
+        }
+        catch (err) { }
+        const tokens = await this.authService.generateTokens(userId, user.email, client_1.Role.MEMBER);
+        await this.authService.updateRefreshToken(userId, tokens.refreshToken);
+        return { message: 'Successfully left the mess', ...tokens };
+    }
 };
 exports.MessService = MessService;
 exports.MessService = MessService = __decorate([

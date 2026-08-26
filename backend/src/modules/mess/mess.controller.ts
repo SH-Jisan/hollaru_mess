@@ -11,7 +11,7 @@ import { MessService } from './mess.service';
 @UseGuards(JwtAuthGuard)
 @Controller('mess')
 export class MessController {
-  constructor(private readonly messService: MessService) {}
+  constructor(private readonly messService: MessService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new mess (Creator becomes MANAGER)' })
@@ -34,4 +34,13 @@ export class MessController {
   getMembers(@CurrentUser() user: { id: string }) {
     return this.messService.getMembers(user.id);
   }
+
+  @Post('leave')
+  @ApiOperation({ summary: 'Leave current mess' })
+  @ApiResponse({ status: 200, description: 'Left mess successfully.' })
+  @ApiResponse({ status: 400, description: 'User not in mess or manager cannot leave.' })
+  leaveMess(@CurrentUser() user: { id: string }) {
+    return this.messService.leaveMess(user.id);
+  }
+
 }

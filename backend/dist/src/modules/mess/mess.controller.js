@@ -34,6 +34,9 @@ let MessController = class MessController {
     getMembers(user) {
         return this.messService.getMembers(user.id);
     }
+    leaveMess(user) {
+        return this.messService.leaveMess(user.id);
+    }
 };
 exports.MessController = MessController;
 __decorate([
@@ -66,6 +69,16 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
 ], MessController.prototype, "getMembers", null);
+__decorate([
+    (0, common_1.Post)('leave'),
+    (0, swagger_1.ApiOperation)({ summary: 'Leave current mess' }),
+    (0, swagger_1.ApiResponse)({ status: 200, description: 'Left mess successfully.' }),
+    (0, swagger_1.ApiResponse)({ status: 400, description: 'User not in mess or manager cannot leave.' }),
+    __param(0, (0, user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], MessController.prototype, "leaveMess", null);
 exports.MessController = MessController = __decorate([
     (0, swagger_1.ApiTags)('Mess Management'),
     (0, swagger_1.ApiBearerAuth)(),

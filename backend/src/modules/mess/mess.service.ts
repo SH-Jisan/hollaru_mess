@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { Role } from '@prisma/client';
@@ -129,4 +129,49 @@ export class MessService {
 
     return members;
   }
+
+    // ৪. মেস থেকে লিভ নেওয়া (Leave Mess)
+  async leaveMess(userId: string) {
+    const { user, mess } = await this.validator.validateUserAndMess(userId);
+
+    // 🛡️ যদি ইউজার ম্যানেজার হয় এবং মেসে অন্য মেম্বার থাকে, তবে লিভ নেওয়া যাবে না
+    if (user.role === Role.MANAGER) {
+      const otherMemberCount = await this.prisma.user.count({
+        where: { messId: mess.id, id: { not: userId } },
+      });
+
+      if (otherMemberCount > 0) {
+        throw new BadRequestException(
+          'Managers cannot leave the mess while other members are still in the mess. Please transfer manager ownership first.',
+        );
+      }
+    }
+
+    // ⚡ ১. ডাটাবেজে ইউজারের messId এবং joinedAt ক্লিয়ার করা
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        messId: null,
+        role: Role.MEMBER,
+        joinedAt: null,
+      },
+    });
+
+    // ⚡ ২. মেম্বার লিস্টের ক্যাশ এবং ইউজারের ক্যাশ মুছে দেওয়া
+    const memberCacheKey = `mess:${mess.id}:members`;
+    try {
+      await Promise.all([
+        this.cacheManager.del(memberCacheKey),
+        this.cacheManager.del(`auth:user:${user.email}`),
+      ]);
+    } catch (err) {}
+
+    // ⚡ ৩. মেস ছাড়া অবস্থায় নতুন টোকেন ইস্যু করা (messId: null)
+    const tokens = await this.authService.generateTokens(userId, user.email, Role.MEMBER);
+    await this.authService.updateRefreshToken(userId, tokens.refreshToken);
+
+    return { message: 'Successfully left the mess', ...tokens };
+  }
+
+  
 }
