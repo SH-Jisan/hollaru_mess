@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meal Book - Enterprise Observability & System Intelligence</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="/system/dashboard.css?v=6">
 </head>
+
 <body>
   <!-- Header Bar -->
   <div class="header">
@@ -14,14 +18,16 @@
       <div class="pulse-dot"></div>
       <div>
         <h1>Meal Book - Enterprise Observability & Telemetry Engine</h1>
-        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Real-Time System Metrics, Database Latency, Redis Cache & API Analytics</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Real-Time System Metrics, Database
+          Latency, Redis Cache & API Analytics</div>
       </div>
       <span class="badge badge-pulse" id="lastUpdated">🟢 Real-Time SSE Active</span>
     </div>
     <div class="header-right">
       <button class="btn-action" onclick="fetchMetrics()">🔄 Refresh Metrics</button>
       <button class="btn-action btn-primary" onclick="exportMetricsJson()">📥 Export JSON Report</button>
-      <div style="font-size: 12px; color: var(--text-muted);">Mode: <strong style="color:var(--success);">⚡ Real-Time SSE Stream (0ms)</strong></div>
+      <div style="font-size: 12px; color: var(--text-muted);">Mode: <strong style="color:var(--success);">⚡ Real-Time
+          SSE Stream (0ms)</strong></div>
     </div>
   </div>
 
@@ -55,7 +61,9 @@
       <div class="card-title">Heap Memory Used</div>
       <div class="card-value" id="heapVal">-- MB</div>
       <div class="card-sub" id="rssVal">RSS: -- MB</div>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="heapProgressBar" style="width: 0%;"></div></div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="heapProgressBar" style="width: 0%;"></div>
+      </div>
     </div>
 
     <div class="card card-neon-amber">
@@ -110,10 +118,14 @@
   <div class="chart-container">
     <div class="chart-header">
       <div>
-        <div style="font-size: 15px; font-weight: 700; color:#fff;">📈 Live Heap & RSS Memory Leak Detector (Native Canvas)</div>
-        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Real-time Node.js process heap memory monitoring with automatic anomaly detection</div>
+        <div style="font-size: 15px; font-weight: 700; color:#fff;">📈 Live Heap & RSS Memory Leak Detector (Native
+          Canvas)</div>
+        <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Real-time Node.js process heap memory
+          monitoring with automatic anomaly detection</div>
       </div>
-      <span class="badge" id="memLeakStatus" style="background:rgba(16,185,129,0.15); color:#34d399; border-color:rgba(16,185,129,0.3);">🟢 Memory Status: Normal</span>
+      <span class="badge" id="memLeakStatus"
+        style="background:rgba(16,185,129,0.15); color:#34d399; border-color:rgba(16,185,129,0.3);">🟢 Memory Status:
+        Normal</span>
     </div>
     <div style="height: 160px; width: 100%; position:relative;">
       <canvas id="memoryChart"></canvas>
@@ -129,7 +141,8 @@
           <span style="width:10px; height:10px; background:#f59e0b; border-radius:50%; inline-block;"></span>
           <span style="width:10px; height:10px; background:#10b981; border-radius:50%; inline-block;"></span>
         </div>
-        <span style="font-size:13px; font-weight:700; color:#cbd5e1; font-family:'JetBrains Mono', monospace;">💻 Live NestJS Server Telemetry & Audit Streamer</span>
+        <span style="font-size:13px; font-weight:700; color:#cbd5e1; font-family:'JetBrains Mono', monospace;">💻 Live
+          NestJS Server Telemetry & Audit Streamer</span>
       </div>
       <div style="display:flex; gap:8px;">
         <button class="terminal-btn active" onclick="filterLogs('ALL', this)">ALL</button>
@@ -147,8 +160,10 @@
   <!-- Swagger Style API Metrics Engine Header & Controls -->
   <div class="controls-bar" style="margin-top:28px;">
     <div>
-      <div style="font-size: 16px; font-weight: 800; color: #fff;">⚡ Per-Route API Telemetry Engine (Swagger Accordion View)</div>
-      <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Click any endpoint to expand real-time latency trends, memory usage, CPU time, and hit history</div>
+      <div style="font-size: 16px; font-weight: 800; color: #fff;">⚡ Per-Route API Telemetry Engine (Swagger Accordion
+        View)</div>
+      <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Click any endpoint to expand real-time
+        latency trends, memory usage, CPU time, and hit history</div>
     </div>
 
     <div class="filter-controls">
@@ -167,7 +182,8 @@
         <option value="recent">Sort by: Recently Hit</option>
       </select>
 
-      <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search API Route..." onkeyup="filterRoutes()">
+      <input type="text" id="searchInput" class="search-box" placeholder="🔍 Search API Route..."
+        onkeyup="filterRoutes()">
     </div>
   </div>
 
@@ -198,7 +214,8 @@
         <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px;">Request Payload (JSON):</div>
         <textarea id="modalBody" class="modal-textarea" placeholder="{}"></textarea>
 
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; margin-bottom:6px;">
+        <div
+          style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; margin-bottom:6px;">
           <div style="font-size:11px; color:var(--text-muted);">Response Payload:</div>
           <div style="font-size:12px; font-weight:700; color:#34d399;" id="testStatusTag">Ready</div>
         </div>
@@ -207,6 +224,7 @@
     </div>
   </div>
 
-  <script src="/system/dashboard.js?v=6" defer></script>
+  <script src="/system/dashboard.js?v=9" defer></script>
 </body>
+
 </html>

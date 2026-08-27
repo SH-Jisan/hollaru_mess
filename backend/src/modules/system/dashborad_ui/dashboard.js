@@ -5,9 +5,10 @@ let memoryHistory = { labels: [], heap: [], rss: [] };
 let routeHistoryMap = new Map();
 let systemLogs = [];
 let selectedLogLevel = 'ALL';
+let openAccordionKeys = new Set();
 
 // =========================================================================
-// 🎨 Enterprise Native HTML5 Canvas Engine (0 External Dependencies)
+// 🎨 Standalone Enterprise Native HTML5 Canvas Engine (0 External Dependencies)
 // =========================================================================
 function drawNativeChart(canvasId, labels, datasets, options = {}) {
   const canvas = document.getElementById(canvasId);
@@ -230,7 +231,6 @@ async function fetchMetrics() {
     updateInsightsPanel(rawMetrics);
     updateRouteHistory(rawMetrics, timeLabel);
     renderAccordionList(rawMetrics);
-    updateRouteCharts();
   } catch (err) {
     console.error('Metrics fetch error:', err);
   }
@@ -243,7 +243,7 @@ function renderTerminalLogs() {
 
   const filtered = systemLogs.filter((l) => selectedLogLevel === 'ALL' || l.level === selectedLogLevel);
   if (filtered.length === 0) {
-    container.innerHTML = '<div style="color:var(--text-muted);">No logs matching filter.</div>';
+    container.innerHTML = '<div style="color:var(--text-muted); padding:10px;">No logs matching filter [' + selectedLogLevel + '].</div>';
     return;
   }
 
@@ -254,7 +254,11 @@ function renderTerminalLogs() {
 
 function filterLogs(level, btnEl) {
   selectedLogLevel = level;
-  document.querySelectorAll('.terminal-btn').forEach((b) => b.classList.remove('active'));
+  document.querySelectorAll('.terminal-btn').forEach((b) => {
+    if (!b.innerText.includes('Clear')) {
+      b.classList.remove('active');
+    }
+  });
   if (btnEl) btnEl.classList.add('active');
   renderTerminalLogs();
 }
@@ -386,6 +390,8 @@ function applySorting() {
 
 function renderAccordionList(metrics) {
   const container = document.getElementById('accordionContainer');
+  if (!container) return;
+
   if (!metrics || metrics.length === 0) {
     container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-muted);">No API calls recorded yet. Hit some endpoints in Postman/Swagger!</div>';
     return;
@@ -408,98 +414,92 @@ function renderAccordionList(metrics) {
     return 0;
   });
 
-  if (container.querySelector('.text-muted') && container.children.length === 1) {
-    container.innerHTML = '';
+  // 🧹 ALWAYS CLEAR CONTAINER BEFORE RENDERING FILTERED ITEMS
+  container.innerHTML = '';
+
+  if (list.length === 0) {
+    container.innerHTML = '<div style="text-align:center; padding:30px; color:var(--text-muted);">No API endpoints match the selected filter [' + selectedMethod + '].</div>';
+    return;
   }
 
   list.forEach((m) => {
     const key = `${m.method}:${m.path}`;
     const safeKey = key.replace(/[^a-zA-Z0-9]/g, '_');
-    let itemEl = document.getElementById(`item-${safeKey}`);
 
     let latClass = 'lat-fast';
     if (m.averageLatencyMs > 100 && m.averageLatencyMs <= 300) latClass = 'lat-med';
     if (m.averageLatencyMs > 300) latClass = 'lat-slow';
 
-    if (!itemEl) {
-      itemEl = document.createElement('div');
-      itemEl.className = 'accordion-item';
-      itemEl.id = `item-${safeKey}`;
-      itemEl.setAttribute('data-key', key);
+    const itemEl = document.createElement('div');
+    itemEl.className = 'accordion-item' + (openAccordionKeys.has(key) ? ' active' : '');
+    itemEl.id = `item-${safeKey}`;
+    itemEl.setAttribute('data-key', key);
 
-      itemEl.innerHTML = `
-        <div class="accordion-header">
-          <div class="accordion-left">
-            <span class="method method-${m.method}">${m.method}</span>
-            <span class="route-path">${m.path}</span>
+    itemEl.innerHTML = `
+      <div class="accordion-header">
+        <div class="accordion-left">
+          <span class="method method-${m.method}">${m.method}</span>
+          <span class="route-path">${m.path}</span>
+        </div>
+        <div class="accordion-right">
+          <button class="btn-ops" style="padding:2px 8px; font-size:11px;" onclick="event.stopPropagation(); openSandboxModal('${m.method}', '${m.path}')">🚀 Test</button>
+          <span style="font-size:12px; color:var(--text-muted);">Calls: <strong style="color:#fff;" id="calls-${safeKey}">${m.totalRequests}</strong></span>
+          <span class="latency-tag ${latClass}" id="latTag-${safeKey}">⚡ Avg: ${m.averageLatencyMs} ms</span>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+
+      <div class="accordion-body">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:12px; margin-bottom:16px;">
+          <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+            <div style="font-size:11px; color:var(--text-muted);">Success / Error</div>
+            <div style="font-size:14px; font-weight:700; color:#34d399; margin-top:2px;" id="succ-${safeKey}">✅ ${m.successfulRequests} / <span style="color:#f87171;">❌ ${m.failedRequests}</span></div>
           </div>
-          <div class="accordion-right">
-            <button class="btn-ops" style="padding:2px 8px; font-size:11px;" onclick="event.stopPropagation(); openSandboxModal('${m.method}', '${m.path}')">🚀 Test</button>
-            <span style="font-size:12px; color:var(--text-muted);">Calls: <strong style="color:#fff;" id="calls-${safeKey}">${m.totalRequests}</strong></span>
-            <span class="latency-tag ${latClass}" id="latTag-${safeKey}">⚡ Avg: ${m.averageLatencyMs} ms</span>
-            <span class="chevron">▼</span>
+          <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+            <div style="font-size:11px; color:var(--text-muted);">Last Response Time</div>
+            <div style="font-size:14px; font-weight:700; color:#38bdf8; margin-top:2px;" id="lastLat-${safeKey}">⏱️ ${m.lastLatencyMs || 0} ms</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+            <div style="font-size:11px; color:var(--text-muted);">Avg Latency</div>
+            <div style="font-size:14px; font-weight:700; color:#818cf8; margin-top:2px;" id="avgLat-${safeKey}">⚡ ${m.averageLatencyMs} ms</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+            <div style="font-size:11px; color:var(--text-muted);">Avg RAM Used</div>
+            <div style="font-size:14px; font-weight:700; color:#a5b4fc; margin-top:2px;" id="ram-${safeKey}">🧠 ${m.averageRamMb || '0.05'} MB</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+            <div style="font-size:11px; color:var(--text-muted);">Avg CPU Time</div>
+            <div style="font-size:14px; font-weight:700; color:#facc15; margin-top:2px;" id="cpu-${safeKey}">⚙️ ${m.averageCpuMs || '0.20'} ms</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
+            <div style="font-size:11px; color:var(--text-muted);">Last Hit Time</div>
+            <div style="font-size:12px; font-weight:600; color:#fff; margin-top:4px;" id="lastTime-${safeKey}">${m.lastRequestedAt ? new Date(m.lastRequestedAt).toLocaleTimeString() : '--'}</div>
           </div>
         </div>
 
-        <div class="accordion-body">
-          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:12px; margin-bottom:16px;">
-            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
-              <div style="font-size:11px; color:var(--text-muted);">Success / Error</div>
-              <div style="font-size:14px; font-weight:700; color:#34d399; margin-top:2px;" id="succ-${safeKey}">✅ ${m.successfulRequests} / <span style="color:#f87171;">❌ ${m.failedRequests}</span></div>
-            </div>
-            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
-              <div style="font-size:11px; color:var(--text-muted);">Last Response Time</div>
-              <div style="font-size:14px; font-weight:700; color:#38bdf8; margin-top:2px;" id="lastLat-${safeKey}">⏱️ ${m.lastLatencyMs || 0} ms</div>
-            </div>
-            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
-              <div style="font-size:11px; color:var(--text-muted);">Avg Latency</div>
-              <div style="font-size:14px; font-weight:700; color:#818cf8; margin-top:2px;" id="avgLat-${safeKey}">⚡ ${m.averageLatencyMs} ms</div>
-            </div>
-            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
-              <div style="font-size:11px; color:var(--text-muted);">Avg RAM Used</div>
-              <div style="font-size:14px; font-weight:700; color:#a5b4fc; margin-top:2px;" id="ram-${safeKey}">🧠 ${m.averageRamMb || '0.05'} MB</div>
-            </div>
-            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
-              <div style="font-size:11px; color:var(--text-muted);">Avg CPU Time</div>
-              <div style="font-size:14px; font-weight:700; color:#facc15; margin-top:2px;" id="cpu-${safeKey}">⚙️ ${m.averageCpuMs || '0.20'} ms</div>
-            </div>
-            <div style="background:rgba(255,255,255,0.03); padding:10px; border-radius:8px; border:1px solid var(--card-border);">
-              <div style="font-size:11px; color:var(--text-muted);">Last Hit Time</div>
-              <div style="font-size:12px; font-weight:600; color:#fff; margin-top:4px;" id="lastTime-${safeKey}">${m.lastRequestedAt ? new Date(m.lastRequestedAt).toLocaleTimeString() : '--'}</div>
-            </div>
-          </div>
-
-          <div style="font-size:12px; font-weight:600; margin-bottom:8px; color:var(--text-muted);">📈 Real-Time Latency Trend (ms):</div>
-          <div style="height:140px; width:100%;">
-            <canvas id="chart-${safeKey}"></canvas>
-          </div>
+        <div style="font-size:12px; font-weight:600; margin-bottom:8px; color:var(--text-muted);">📈 Real-Time Latency Trend (ms):</div>
+        <div style="height:140px; width:100%;">
+          <canvas id="chart-${safeKey}"></canvas>
         </div>
-      `;
-      container.appendChild(itemEl);
+      </div>
+    `;
+    container.appendChild(itemEl);
 
-      const header = itemEl.querySelector('.accordion-header');
-      if (header) {
-        header.onclick = function () {
-          itemEl.classList.toggle('active');
-          if (itemEl.classList.contains('active')) {
-            setTimeout(() => initRouteChart(key, safeKey), 50);
-          }
-        };
-      }
-    } else {
-      document.getElementById(`calls-${safeKey}`).innerText = m.totalRequests;
-      document.getElementById(`succ-${safeKey}`).innerHTML = `✅ ${m.successfulRequests} / <span style="color:#f87171;">❌ ${m.failedRequests}</span>`;
-      if (document.getElementById(`lastLat-${safeKey}`)) document.getElementById(`lastLat-${safeKey}`).innerText = `⏱️ ${m.lastLatencyMs || 0} ms`;
-      document.getElementById(`avgLat-${safeKey}`).innerText = `⚡ ${m.averageLatencyMs} ms`;
-      if (document.getElementById(`ram-${safeKey}`)) document.getElementById(`ram-${safeKey}`).innerText = `🧠 ${m.averageRamMb || '0.05'} MB`;
-      if (document.getElementById(`cpu-${safeKey}`)) document.getElementById(`cpu-${safeKey}`).innerText = `⚙️ ${m.averageCpuMs || '0.20'} ms`;
-      document.getElementById(`lastTime-${safeKey}`).innerText = m.lastRequestedAt ? new Date(m.lastRequestedAt).toLocaleTimeString() : '--';
-
-      const tag = document.getElementById(`latTag-${safeKey}`);
-      tag.className = `latency-tag ${latClass}`;
-      tag.innerText = `⚡ Avg: ${m.averageLatencyMs} ms`;
+    const header = itemEl.querySelector('.accordion-header');
+    if (header) {
+      header.onclick = function () {
+        itemEl.classList.toggle('active');
+        if (itemEl.classList.contains('active')) {
+          openAccordionKeys.add(key);
+          setTimeout(() => initRouteChart(key, safeKey), 50);
+        } else {
+          openAccordionKeys.delete(key);
+        }
+      };
     }
   });
+
+  updateRouteCharts();
 }
 
 function initRouteChart(key, safeKey) {
@@ -536,6 +536,99 @@ function exportMetricsJson() {
   downloadAnchor.remove();
 }
 
+// 🌐 Explicitly Bind All Handler Functions to Window Scope
+window.filterByMethod = filterByMethod;
+window.applySorting = applySorting;
+window.filterRoutes = filterRoutes;
+window.filterLogs = filterLogs;
+window.clearTerminalLogs = clearTerminalLogs;
+window.triggerClearCache = triggerClearCache;
+window.triggerRetryQueue = triggerRetryQueue;
+window.openSandboxModal = openSandboxModal;
+window.closeSandboxModal = closeSandboxModal;
+window.executeApiTest = executeApiTest;
+window.fetchMetrics = fetchMetrics;
+window.exportMetricsJson = exportMetricsJson;
+
+// ⚡ 🌐 Direct Professional DOM Event Listener Attachments for ALL Dashboard Buttons
+function setupDomEventListeners() {
+  // 1. Operations Bar Buttons (.ops-bar .btn-ops)
+  document.querySelectorAll('.ops-bar .btn-ops').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const text = e.currentTarget.innerText.trim();
+      if (text.includes('Flush')) {
+        triggerClearCache();
+      } else if (text.includes('Retry')) {
+        triggerRetryQueue();
+      } else if (text.includes('Sandbox')) {
+        openSandboxModal('GET', '/system/status');
+      }
+    });
+  });
+
+  // 2. Header Action Buttons (.header-right .btn-action)
+  document.querySelectorAll('.header-right .btn-action').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const text = e.currentTarget.innerText.trim();
+      if (text.includes('Refresh')) {
+        fetchMetrics();
+      } else if (text.includes('Export')) {
+        exportMetricsJson();
+      }
+    });
+  });
+
+  // 3. Method Filter Pills (.method-pills .pill)
+  document.querySelectorAll('.method-pills .pill').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const method = e.currentTarget.innerText.trim().toUpperCase();
+      filterByMethod(method, e.currentTarget);
+    });
+  });
+
+  // 4. Terminal Log Filter Buttons (.terminal-header .terminal-btn)
+  document.querySelectorAll('.terminal-header .terminal-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const text = e.currentTarget.innerText.trim();
+      if (text.includes('Clear')) {
+        clearTerminalLogs();
+      } else {
+        filterLogs(text, e.currentTarget);
+      }
+    });
+  });
+
+  // 5. Search Input & Sort Select
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', () => filterRoutes());
+  }
+
+  const sortSelect = document.getElementById('sortSelect');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', () => applySorting());
+  }
+
+  // 6. Modal Close & Overlay Click
+  const modalCloseBtn = document.querySelector('.modal-close');
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', () => closeSandboxModal());
+  }
+
+  const sandboxModal = document.getElementById('sandboxModal');
+  if (sandboxModal) {
+    sandboxModal.addEventListener('click', (e) => {
+      if (e.target === sandboxModal) closeSandboxModal();
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupDomEventListeners);
+} else {
+  setupDomEventListeners();
+}
+
 // Real-Time SSE Setup
 const eventSource = new EventSource('/system/events');
 
@@ -558,7 +651,6 @@ eventSource.onmessage = (event) => {
       updateInsightsPanel(rawMetrics);
       updateRouteHistory(rawMetrics, timeLabel);
       renderAccordionList(rawMetrics);
-      updateRouteCharts();
     }
   } catch (err) {}
 };
