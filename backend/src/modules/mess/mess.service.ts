@@ -87,11 +87,14 @@ export class MessService {
 
     // 🔴 Invalidation: মেম্বার লিস্টের ক্যাশ এবং ইউজারের প্রোফাইল ক্যাশ মুছে দেওয়া
     const memberCacheKey = `mess:${mess.id}:members`;
+    const manager = await this.prisma.user.findUnique({where: {id: mess.managerId}});
     try {
-      await Promise.all([
-        this.cacheManager.del(memberCacheKey),
-        this.cacheManager.del(`auth:user:${updatedUser.email}`),
-      ]);
+      const keysToDel = [
+        memberCacheKey,
+        `auth:user:${updatedUser.email}`,
+      ];
+      if(manager) keysToDel.push(`auth:user:${manager.email}`);
+      await Promise.all(keysToDel.map(k => this.cacheManager.del(k)));
     } catch (err) {
       // Catch error cleanly if Redis is down
     }
@@ -117,7 +120,7 @@ export class MessService {
 
     // 🗄️ ২. ক্যাশে না থাকলে ডাটাবেজ থেকে রিড করা
     const members = await this.prisma.user.findMany({
-      where: { messId: user.messId! },
+      where: { messId: user.messId!, leftAt: null, },
       select: {
         id: true,
         name: true,
@@ -125,6 +128,9 @@ export class MessService {
         phone: true,
         role: true,
         joinedAt: true,
+      },
+      orderBy:{
+        joinedAt: 'asc',
       },
     });
 

@@ -64,7 +64,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
               connectTimeout: 2000,
               maxRetriesPerRequest: 1,
             });
-            await pingClient.ping();
+            // ⚡ PING এবং SET টেস্ট (যাতে Limit Exceeded হলে সঙ্গে সঙ্গে ২য় রডিসে সুইচ করে)
+            await pingClient.set('health_check', '1', 'EX', 10);
             await pingClient.quit();
           } catch (err) {
             console.warn(`⚠️ Primary Redis (${host}) limit reached or offline! Switched to Secondary Backup Redis (${secondaryHost}).`);
