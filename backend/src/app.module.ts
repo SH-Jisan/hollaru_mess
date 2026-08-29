@@ -17,6 +17,7 @@ import { SystemModule } from './modules/system/system.module';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptors';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { AppCacheModule } from './common/cache/cache.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
       isGlobal: true,
       validate,
     }),
+    AppCacheModule,
     CacheModule.register({
       isGlobal: true,
       ttl: 300000,
@@ -44,10 +46,10 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        let host = configService.get<string>('REDIS_HOST_1') 
-        || configService.get<string>('REDIS_HOST');
-        let password = configService.get<string>('REDIS_PASSWORD_1') 
-        || configService.get<string>('REDIS_PASSWORD');
+        let host = configService.get<string>('REDIS_HOST_1')
+          || configService.get<string>('REDIS_HOST');
+        let password = configService.get<string>('REDIS_PASSWORD_1')
+          || configService.get<string>('REDIS_PASSWORD');
         const secondaryHost = configService.get<string>('REDIS_HOST_2');
         const secondaryPassword = configService.get<string>('REDIS_PASSWORD_2');
 
@@ -59,8 +61,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
               host,
               port: configService.get<number>('REDIS_PORT_1', 6379),
               password,
-              tls: (configService.get<string>('REDIS_TLS_1') 
-              || configService.get<string>('REDIS_TLS')) === 'true' ? {} : undefined,
+              tls: (configService.get<string>('REDIS_TLS_1')
+                || configService.get<string>('REDIS_TLS')) === 'true' ? {} : undefined,
               connectTimeout: 2000,
               maxRetriesPerRequest: 1,
             });
@@ -113,4 +115,4 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

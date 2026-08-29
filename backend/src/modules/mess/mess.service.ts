@@ -1,7 +1,5 @@
-import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import type { Cache } from 'cache-manager';
 import { Queue } from 'bullmq';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -11,6 +9,10 @@ import { CreateMessDto } from './dto/create-mess.dto';
 import { JoinMessDto } from './dto/join-mess.dto';
 import { TransferManagerDto } from './dto/transfer-manager.dto';
 import { AuthService } from '../auth/auth.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AppCacheService } from '../../common/cache/app-cache.service';
+import { CacheKeys } from '../../common/cache/cache-keys';
+import { CacheEvents } from '../../common/cache/cache-events.enum';
 
 @Injectable()
 export class MessService {
@@ -18,7 +20,8 @@ export class MessService {
     private prisma: PrismaService,
     private validator: ContextValidatorService,
     private authService: AuthService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private appCache: AppCacheService,
+    private eventEmitter: EventEmitter2,
     @InjectQueue('notification-queue') private notificationQueue: Queue,
   ) { }
 
@@ -50,15 +53,11 @@ export class MessService {
       });
       return mess;
     });
-    // 🔴 INVALIDATION: ইউজারের পুরনো MEMBER ক্যাশ মুছে দেওয়া যাতে সাথে সাথে MANAGER রোল কার্যকর হয়
-    try {
-      await this.cacheManager.del(`auth:user:${user.email}`);
-    } catch (err) {
-      // Catch error cleanly if Redis is down
-    }
+
+    // 📡 Event-Driven Cache Invalidation
+    this.eventEmitter.emit(CacheEvents.USER_PROFILE_UPDATED, { email: user.email });
 
     const tokens = await this.authService.generateTokens(userId, user.email, Role.MANAGER);
-        // ⚡ ৩. ডাটাবেজে নতুন রিফ্রেশ টোকেনটির হ্যাশ সেভ করা (বিশাল গুরুত্বপূর্ণ 🔴)
     await this.authService.updateRefreshToken(userId, tokens.refreshToken);
 
     return { mess, ...tokens };
@@ -85,23 +84,15 @@ export class MessService {
       },
     });
 
-    // 🔴 Invalidation: মেম্বার লিস্টের ক্যাশ এবং ইউজারের প্রোফাইল ক্যাশ মুছে দেওয়া
-    const memberCacheKey = `mess:${mess.id}:members`;
-    const manager = await this.prisma.user.findUnique({where: {id: mess.managerId}});
-    try {
-      const keysToDel = [
-        memberCacheKey,
-        `auth:user:${updatedUser.email}`,
-      ];
-      if(manager) keysToDel.push(`auth:user:${manager.email}`);
-      await Promise.all(keysToDel.map(k => this.cacheManager.del(k)));
-    } catch (err) {
-      // Catch error cleanly if Redis is down
-    }
+    // 📡 Event-Driven Cache Invalidation
+    const manager = await this.prisma.user.findUnique({ where: { id: mess.managerId } });
+    this.eventEmitter.emit(CacheEvents.MEMBER_JOINED, {
+      messId: mess.id,
+      memberEmail: updatedUser.email,
+      managerEmail: manager?.email,
+    });
 
     const tokens = await this.authService.generateTokens(userId, updatedUser.email, Role.MEMBER);
-    
-    // ⚡ ডাটাবেজে নতুন রিফ্রেশ টোকেনটির হ্যাশ সেভ করা (বিশাল গুরুত্বপূর্ণ 🔴)
     await this.authService.updateRefreshToken(userId, tokens.refreshToken);
 
     return { message: 'Successfully joined the mess', messName: mess.name, ...tokens };
@@ -110,41 +101,33 @@ export class MessService {
   // ৩. মেসের সব মেম্বারদের তালিকা দেখা (Cache-Aside Pattern)
   async getMembers(userId: string) {
     const { user } = await this.validator.validateUserAndMess(userId);
-    const cacheKey = `mess:${user.messId!}:members`;
+    const cacheKey = CacheKeys.messMembers(user.messId!);
 
-    // ⚡ ১. ক্যাশে চেক করা
-    const cachedMembers = await this.cacheManager.get(cacheKey);
-    if (cachedMembers) {
-      return cachedMembers; // 0ms রেসপন্স!
-    }
-
-    // 🗄️ ২. ক্যাশে না থাকলে ডাটাবেজ থেকে রিড করা
-    const members = await this.prisma.user.findMany({
-      where: { messId: user.messId!, leftAt: null, },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        joinedAt: true,
-      },
-      orderBy:{
-        joinedAt: 'asc',
-      },
-    });
-
-    // 💾 ৩. কেও জয়েন/রিমুভ না হওয়ার পর্জন্ত মেম্বার ডাটা সেইভ থাকবে।
-    await this.cacheManager.set(cacheKey, members, 0);
-
-    return members;
+    return this.appCache.remember(cacheKey, 60, () =>
+      this.prisma.user.findMany({
+        where: {
+          messId: user.messId!,
+          leftAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          joinedAt: true,
+        },
+        orderBy: {
+          joinedAt: 'asc',
+        },
+      }),
+    );
   }
 
-    // ৪. মেস থেকে লিভ নেওয়া (Leave Mess)
+  // ৪. মেস থেকে লিভ নেওয়া (Leave Mess)
   async leaveMess(userId: string) {
     const { user, mess } = await this.validator.validateUserAndMess(userId);
 
-    // 🛡️ যদি ইউজার ম্যানেজার হয় এবং মেসে অন্য মেম্বার থাকে, তবে লিভ নেওয়া যাবে না
     if (user.role === Role.MANAGER) {
       const otherMemberCount = await this.prisma.user.count({
         where: { messId: mess.id, id: { not: userId } },
@@ -157,7 +140,6 @@ export class MessService {
       }
     }
 
-    // ⚡ ১. ডাটাবেজে ইউজারের messId এবং joinedAt ক্লিয়ার করা
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -168,21 +150,15 @@ export class MessService {
       },
     });
 
-    // ⚡ ২. মেম্বার লিস্টের ক্যাশ এবং ইউজারের ক্যাশ মুছে দেওয়া
-    const memberCacheKey = `mess:${mess.id}:members`;
-    const billingCacheKey = mess.currentMonthId ? `billing:${mess.id}:${mess.currentMonthId}:summary` : null;
-    try {
-      await Promise.all([
-        this.cacheManager.del(memberCacheKey),
-        this.cacheManager.del(`auth:user:${user.email}`),
-        billingCacheKey ? this.cacheManager.del(billingCacheKey) : Promise.resolve(),
-      ]);
-    } catch (err) {}
+    // 📡 Event-Driven Cache Invalidation
+    this.eventEmitter.emit(CacheEvents.MEMBER_LEFT, {
+      messId: mess.id,
+      memberEmail: user.email,
+      monthId: mess.currentMonthId,
+    });
 
-    // ⚡ ৩. মেস ছাড়া অবস্থায় নতুন টোকেন ইস্যু করা (messId: null)
     const tokens = await this.authService.generateTokens(userId, user.email, Role.MEMBER);
     await this.authService.updateRefreshToken(userId, tokens.refreshToken);
-    
 
     return { message: 'Successfully left the mess', ...tokens };
   }
@@ -199,7 +175,7 @@ export class MessService {
     if (!newManager || newManager.messId !== mess.id) {
       throw new BadRequestException('The selected member does not belong to this mess.');
     }
-    // ⚛️ ট্রানজেকশনে ম্যানেজার রোল সোয়াইপ করা
+
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: currentManagerId },
@@ -214,16 +190,14 @@ export class MessService {
         data: { managerId: dto.newManagerId },
       });
     });
-    // ⚡ ক্যাশ মুছে দেওয়া
-    const memberCacheKey = `mess:${mess.id}:members`;
-    try {
-      await Promise.all([
-        this.cacheManager.del(memberCacheKey),
-        this.cacheManager.del(`auth:user:${manager.email}`),
-        this.cacheManager.del(`auth:user:${newManager.email}`),
-      ]);
-    } catch (err) {}
-    // 🔔 ব্যাকগ্রাউন্ড কিউতে মেসের সব মেম্বারদের ফোনে পুশ নোটিফিকেশন পাঠানো
+
+    // 📡 Event-Driven Cache Invalidation
+    this.eventEmitter.emit(CacheEvents.MANAGER_TRANSFERRED, {
+      messId: mess.id,
+      oldManagerEmail: manager.email,
+      newManagerEmail: newManager.email,
+    });
+
     const messMembers = await this.prisma.user.findMany({
       where: { messId: mess.id },
       select: { id: true },
@@ -237,5 +211,4 @@ export class MessService {
     }
     return { message: `Manager ownership successfully transferred to ${newManager.name}` };
   }
-  
 }
