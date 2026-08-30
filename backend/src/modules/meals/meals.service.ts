@@ -143,6 +143,7 @@ export class MealsService {
   }
 
   private checkDeadline(mess: any, type: string) {
+    const temp = 0;
     const now = new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
