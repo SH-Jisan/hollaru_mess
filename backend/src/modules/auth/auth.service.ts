@@ -17,6 +17,8 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { Prisma } from '@prisma/client';
+import { CacheKeys } from '../../common/cache/cache-keys';
+
 
 @Injectable()
 export class AuthService {
@@ -121,7 +123,7 @@ export class AuthService {
   
   // ২. লগইন ভেরিফিকেশন লজিক (Ultra Fast Sub-50ms with Secure Redis Auth Cache)
   async login(dto: LoginDto) {
-    const cacheKey = `auth:user:${dto.email}`;
+    const cacheKey = CacheKeys.userProfile(dto.email);
 
     // ⚡ 1. Ultra-fast 1ms Redis User Auth Check (Skips 60ms PostgreSQL network trip!)
     let user: any = null;
@@ -181,7 +183,7 @@ export class AuthService {
   // 🔒 FIX DRAWBACK 1: Helper method to invalidate stale user cache when profile/password is updated
   async clearUserAuthCache(email: string) {
     try{
-    await this.cacheManager.del(`auth:user:${email}`);
+      await this.cacheManager.del(CacheKeys.userProfile(email));
     } catch (err){
       // ignore error
     }
@@ -267,7 +269,7 @@ export class AuthService {
       try {
         const cleanToken = accessToken.replace('Bearer ', '').trim();
         if (cleanToken) {
-          await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+          await this.cacheManager.set(CacheKeys.tokenBlacklist(cleanToken), 'REVOKED', 900000);
         }
       } catch (err) {
         // ignore
@@ -284,20 +286,19 @@ export class AuthService {
 
     await Promise.all([
       this.prisma.user.update({
-        where: {id: userId},
-        data: {hashedRefreshToken: null},
+        where: { id: userId },
+        data: { hashedRefreshToken: null },
       }),
-      this.cacheManager.set(`auth:logout_all:${userId}`, revocationTimestamp, 900000).catch(() =>{}),
+      this.cacheManager.set(CacheKeys.logoutAll(userId), revocationTimestamp, 900000).catch(() => {}),
       this.clearUserAuthCache(email),
     ]);
-
 
     // ⚡ Access Token Blacklisting for current device as well
     if (accessToken) {
       try {
         const cleanToken = accessToken.replace('Bearer ', '').trim();
-        if( cleanToken){
-        await this.cacheManager.set(`auth:blacklist:${cleanToken}`, 'REVOKED', 900000);
+        if (cleanToken) {
+          await this.cacheManager.set(CacheKeys.tokenBlacklist(cleanToken), 'REVOKED', 900000);
         }
       } catch (err) {
         // ignore

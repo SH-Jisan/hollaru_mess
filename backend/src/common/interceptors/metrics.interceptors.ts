@@ -5,7 +5,7 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { Observable, ReplaySubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -25,6 +25,8 @@ export interface RouteMetric {
   averageCpuMs: number;
   lastRequestedAt: string;
 }
+import { CacheKeys } from '../cache/cache-keys';
+
 
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
@@ -103,9 +105,9 @@ export class MetricsInterceptor implements NestInterceptor {
           if (now - lastSync > 60000){
           MetricsInterceptor.lastRedisSyncMap.set(metricKey, now);
           const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
-          const redisKey = `metrics:monthly:${currentMonth}:${metricKey}`;
-          const ttlSeconds = 30 * 24 * 60 * 60; // 30 Days Auto Expiration
-          await this.cacheManager.set(redisKey, existing, ttlSeconds);
+          const redisKey = CacheKeys.monthlyMetrics(currentMonth, metricKey);
+          const ttlMs = 30 * 24 * 60 * 60 * 1000; // 30 Days Auto Expiration
+          await this.cacheManager.set(redisKey, existing, ttlMs);
 
           }
           
