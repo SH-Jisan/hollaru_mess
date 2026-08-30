@@ -1,20 +1,24 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import type { Cache } from 'cache-manager';
 import { Queue } from 'bullmq';
 import { RequestStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { UpdateMealDto } from './dto/update-meal.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AppCacheService } from '../../common/cache/app-cache.service';
+import { CacheKeys } from '../../common/cache/cache-keys';
+import { CacheEvents } from '../../common/cache/cache-events.enum';
+
 
 @Injectable()
 export class MealsService {
   constructor(
     private prisma: PrismaService,
     private validator: ContextValidatorService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    @InjectQueue('notification-queue') private notificationQueue: Queue, // 👈 BullMQ Queue ইনজেক্ট করা
+    private appCache: AppCacheService,
+    private eventEmitter: EventEmitter2,
+    @InjectQueue('notification-queue') private notificationQueue: Queue,
   ) {}
 
   async requestMealUpdate(dto: UpdateMealDto, userId: string) {
@@ -79,9 +83,13 @@ export class MealsService {
     });
 
     // 🔴 Invalidation: আজকের লাইভ মিলের ক্যাশ মুছে দেওয়া
+        // 📡 Event-Driven Cache Invalidation
     const todayStr = new Date().toISOString().split('T')[0];
-    const cacheKey = `meals:${manager.messId!}:${todayStr}:live`;
-    await this.cacheManager.del(cacheKey);
+    this.eventEmitter.emit(CacheEvents.MEAL_UPDATED, {
+      messId: manager.messId!,
+      dateStr: todayStr,
+    });
+
 
     // ⚡ BACKGROUND QUEUE: মেম্বারের ফোনে ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন জব পুশ করা
     await this.notificationQueue.add('send-user-notification', {
@@ -96,32 +104,27 @@ export class MealsService {
   async getDailyLiveCount(userId: string) {
     const { user } = await this.validator.validateUserAndMess(userId);
     const todayStr = new Date().toISOString().split('T')[0];
-    const cacheKey = `meals:${user.messId!}:${todayStr}:live`;
+    const cacheKey = CacheKeys.dailyMealLog(user.messId!, todayStr);
 
-    const cachedData = await this.cacheManager.get(cacheKey);
-    if (cachedData) {
-      return cachedData;
-    }
-
-    const log = await this.prisma.dailyLog.findFirst({
-      where: {
-        id: todayStr,
-        month: { messId: user.messId! },
-      },
-      include: {
-        requests: {
-          include: {
-            user: { select: { name: true, role: true } },
+    return this.appCache.remember(cacheKey, 300, async () => {
+      const log = await this.prisma.dailyLog.findFirst({
+        where: {
+          id: todayStr,
+          month: { messId: user.messId! },
+        },
+        include: {
+          requests: {
+            include: {
+              user: { select: { name: true, role: true } },
+            },
           },
         },
-      },
+      });
+
+      return log || { message: 'No meal records initialized for today yet.' };
     });
-
-    const responseData = log || { message: 'No meal records initialized for today yet.' };
-    await this.cacheManager.set(cacheKey, responseData, 43200000);
-
-    return responseData;
   }
+
 
   private async getOrCreateDailyLog(monthId: string, dateStr: string, messId: string) {
     let log = await this.prisma.dailyLog.findUnique({ where: { id: dateStr } });
