@@ -1,21 +1,24 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import type { Cache } from 'cache-manager';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { CompletePurchaseDto } from './dto/complete-purchase.dto';
 import { CreateBazaarItemDto } from './dto/create-bazaar-item.dto';
 import { CreateDepositDto } from './dto/create-deposit.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { AppCacheService } from '../../common/cache/app-cache.service';
+import { CacheKeys } from '../../common/cache/cache-keys';
+import { CacheEvents } from '../../common/cache/cache-events.enum';
 
 @Injectable()
 export class BazaarService {
   constructor(
     private prisma: PrismaService,
     private validator: ContextValidatorService,
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    @InjectQueue('notification-queue') private notificationQueue: Queue, // 👈 BullMQ Queue ইনজেক্ট করা
+    private appCache: AppCacheService,
+    private eventEmitter: EventEmitter2,
+    @InjectQueue('notification-queue') private notificationQueue: Queue,
   ) {}
 
   async createBazaarItem(dto: CreateBazaarItemDto, userId: string) {
@@ -29,9 +32,11 @@ export class BazaarService {
       },
     });
 
-    // 🔴 Invalidation: বাজার ক্যাশ ক্লিয়ার করা
-    const cacheKey = `bazaar:${mess.id}:${activeMonthId}:list`;
-    await this.cacheManager.del(cacheKey);
+    // 📡 Event-Driven Cache Invalidation (Bazaar & Billing Summary)
+    this.eventEmitter.emit(CacheEvents.BAZAAR_UPDATED, {
+      messId: mess.id,
+      monthId: activeMonthId,
+    });
 
     // ⚡ BACKGROUND QUEUE: মেসের সব মেম্বারদের ফোনে ব্যাকগ্রাউন্ড পুশ নোটিফিকেশন জব পুশ করা
     await this.notificationQueue.add('send-mess-notification', {
@@ -61,11 +66,11 @@ export class BazaarService {
     });
 
     if (mess.currentMonthId) {
-      const cacheKey = `bazaar:${mess.id}:${mess.currentMonthId}:list`;
-      await this.cacheManager.del(cacheKey);
-
-      const billingCacheKey = `billing:${mess.id}:${mess.currentMonthId}:summary`;
-      await this.cacheManager.del(billingCacheKey);
+      // 📡 Event-Driven Cache Invalidation (Bazaar & Billing Summary)
+      this.eventEmitter.emit(CacheEvents.BAZAAR_UPDATED, {
+        messId: mess.id,
+        monthId: mess.currentMonthId,
+      });
     }
 
     return updatedItem;
@@ -75,20 +80,15 @@ export class BazaarService {
     const { mess } = await this.validator.validateUserAndMess(userId);
     if (!mess.currentMonthId) return [];
 
-    const cacheKey = `bazaar:${mess.id}:${mess.currentMonthId}:list`;
+    const monthId = mess.currentMonthId; // 👈 Type narrowing for TypeScript closure
+    const cacheKey = CacheKeys.bazaarList(mess.id, monthId);
 
-    const cachedList = await this.cacheManager.get(cacheKey);
-    if (cachedList) {
-      return cachedList;
-    }
-
-    const bazaarList = await this.prisma.bazaarItem.findMany({
-      where: { monthId: mess.currentMonthId },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    await this.cacheManager.set(cacheKey, bazaarList, 0);
-    return bazaarList;
+    return this.appCache.remember(cacheKey, 300, () =>
+      this.prisma.bazaarItem.findMany({
+        where: { monthId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async addDeposit(dto: CreateDepositDto, managerId: string) {
@@ -111,8 +111,11 @@ export class BazaarService {
       },
     });
 
-    const billingCacheKey = `billing:${mess.id}:${mess.currentMonthId}:summary`;
-    await this.cacheManager.del(billingCacheKey);
+    // 📡 Event-Driven Cache Invalidation (Billing Summary Invalidated on New Deposit)
+    this.eventEmitter.emit(CacheEvents.BILLING_UPDATED, {
+      messId: mess.id,
+      monthId: mess.currentMonthId,
+    });
 
     // ⚡ BACKGROUND QUEUE: যে মেম্বারের ডিপোজিট জমা হলো তার ফোনে নোটিফিকেশন জব পুশ করা
     await this.notificationQueue.add('send-user-notification', {
