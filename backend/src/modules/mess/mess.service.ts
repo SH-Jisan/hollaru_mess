@@ -49,6 +49,7 @@ export class MessService {
           messId: mess.id,
           role: Role.MANAGER,
           joinedAt: new Date(),
+          leftAt: null,
         },
       });
       return mess;
@@ -81,6 +82,7 @@ export class MessService {
         messId: mess.id,
         role: Role.MEMBER,
         joinedAt: new Date(),
+        leftAt: null,
       },
     });
 
@@ -107,7 +109,6 @@ export class MessService {
       this.prisma.user.findMany({
         where: {
           messId: user.messId!,
-          leftAt: null,
         },
         select: {
           id: true,
