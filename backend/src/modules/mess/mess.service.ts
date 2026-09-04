@@ -8,7 +8,6 @@ import { MessCodeNotFoundException } from '../../common/exceptions/domain.except
 import { CreateMessDto } from './dto/create-mess.dto';
 import { JoinMessDto } from './dto/join-mess.dto';
 import { TransferManagerDto } from './dto/transfer-manager.dto';
-import { AuthService } from '../auth/auth.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppCacheService } from '../../common/cache/app-cache.service';
 import { CacheKeys } from '../../common/cache/cache-keys';
@@ -19,7 +18,6 @@ export class MessService {
   constructor(
     private prisma: PrismaService,
     private validator: ContextValidatorService,
-    private authService: AuthService,
     private appCache: AppCacheService,
     private eventEmitter: EventEmitter2,
     @InjectQueue('notification-queue') private notificationQueue: Queue,
@@ -58,10 +56,7 @@ export class MessService {
     // 📡 Event-Driven Cache Invalidation
     this.eventEmitter.emit(CacheEvents.USER_PROFILE_UPDATED, { email: user.email });
 
-    const tokens = await this.authService.generateTokens(userId, user.email, Role.MANAGER);
-    await this.authService.updateRefreshToken(userId, tokens.refreshToken);
-
-    return { mess, ...tokens };
+    return { message: 'Mess created successfully', mess };
   }
 
   // ২. ইনভাইট কোড দিয়ে মেসে জয়েন করা
@@ -94,10 +89,7 @@ export class MessService {
       managerEmail: manager?.email,
     });
 
-    const tokens = await this.authService.generateTokens(userId, updatedUser.email, Role.MEMBER);
-    await this.authService.updateRefreshToken(userId, tokens.refreshToken);
-
-    return { message: 'Successfully joined the mess', messName: mess.name, ...tokens };
+    return { message: 'Successfully joined the mess', messName: mess.name};
   }
 
   // ৩. মেসের সব মেম্বারদের তালিকা দেখা (Cache-Aside Pattern)
@@ -158,10 +150,7 @@ export class MessService {
       monthId: mess.currentMonthId,
     });
 
-    const tokens = await this.authService.generateTokens(userId, user.email, Role.MEMBER);
-    await this.authService.updateRefreshToken(userId, tokens.refreshToken);
-
-    return { message: 'Successfully left the mess', ...tokens };
+    return { message: 'Successfully left the mess',};
   }
 
   // ৫. মেস ম্যানেজার পরিবর্তন ও প্রমোট করা (Transfer Manager Ownership)
