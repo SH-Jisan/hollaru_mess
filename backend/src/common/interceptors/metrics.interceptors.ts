@@ -5,7 +5,7 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { Observable, ReplaySubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -108,7 +108,6 @@ export class MetricsInterceptor implements NestInterceptor {
           const redisKey = CacheKeys.monthlyMetrics(currentMonth, metricKey);
           const ttlMs = 30 * 24 * 60 * 60 * 1000; // 30 Days Auto Expiration
           await this.cacheManager.set(redisKey, existing, ttlMs);
-
           }
           
         } catch (err) {

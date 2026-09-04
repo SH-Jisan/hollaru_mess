@@ -59,8 +59,8 @@ export class SystemController {
   }
 
   private readFile(fileName: string): string {
-    const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashborad_ui', fileName);
-    const distPath = path.join(__dirname, 'dashborad_ui', fileName);
+    const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashboard_ui', fileName);
+    const distPath = path.join(__dirname, 'dashboard_ui', fileName);
 
     const filePath = fs.existsSync(srcPath) ? srcPath : distPath;
     return fs.readFileSync(filePath, 'utf8');

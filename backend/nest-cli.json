@@ -6,8 +6,8 @@
     "deleteOutDir": true,
     "assets": [
       {
-        "include": "modules/system/dashborad_ui/**/*",
-        "outDir": "dist/modules/system/dashborad_ui",
+        "include": "modules/system/dashboard_ui/**/*",
+        "outDir": "dist/",
         "watchAssets": true
       }
     ]
