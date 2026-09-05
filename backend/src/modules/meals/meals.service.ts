@@ -101,38 +101,39 @@ export class MealsService {
     return result;
   }
 
-  async getDailyLiveCount(userId: string) {
-    const { user } = await this.validator.validateUserAndMess(userId);
+  async getDailyLiveCount(userId: string){
+    const { user, mess } = await this.validator.validateUserAndMess(userId);
+    if (!mess.currentMonthId) return { message: 'No active month session' };
+
     const todayStr = new Date().toISOString().split('T')[0];
+    const logId = `${mess.currentMonthId}_${todayStr}`;
     const cacheKey = CacheKeys.dailyMealLog(user.messId!, todayStr);
 
     return this.appCache.remember(cacheKey, 300, async () => {
-      const log = await this.prisma.dailyLog.findFirst({
-        where: {
-          id: todayStr,
-          month: { messId: user.messId! },
-        },
+      const log = await this.prisma.dailyLog.findUnique({
+        where: { id: logId},
         include: {
           requests: {
             include: {
-              user: { select: { name: true, role: true } },
+              user: { select: { name: true, role: true} },
             },
           },
         },
       });
-
-      return log || { message: 'No meal records initialized for today yet.' };
+      return log || { message: 'No meal record initialized for today yet.'};
     });
   }
 
 
   private async getOrCreateDailyLog(monthId: string, dateStr: string, messId: string) {
-    let log = await this.prisma.dailyLog.findUnique({ where: { id: dateStr } });
+    const logId = `${monthId}_${dateStr}`;
+    let log = await this.prisma.dailyLog.findUnique({ where: { id: logId } });
+
     if (!log) {
-      const memberCount = await this.prisma.user.count({ where: { messId } });
+      const memberCount = await this.prisma.user.count({ where: { messId, leftAt: null } });
       log = await this.prisma.dailyLog.create({
         data: {
-          id: dateStr,
+          id: logId,
           monthId,
           lunchCount: memberCount,
           dinnerCount: memberCount,
