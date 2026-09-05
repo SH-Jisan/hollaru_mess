@@ -19,7 +19,9 @@ export class NotificationService implements OnModuleInit {
       }
       this.firebaseInitialized = true;
     } catch (error) {
-      this.logger.warn('Firebase credentials not configured yet. Push notifications will run in mock/log mode.');
+      this.logger.warn(
+        'Firebase credentials not configured yet. Push notifications will run in mock/log mode.',
+      );
     }
   }
 
@@ -69,7 +71,7 @@ export class NotificationService implements OnModuleInit {
       select: { id: true, fcmToken: true },
     });
 
-    if(!members.length) return;
+    if (!members.length) return;
 
     const notificationEntries = members.map((member) => ({
       userId: member.id,
@@ -81,19 +83,23 @@ export class NotificationService implements OnModuleInit {
       data: notificationEntries,
     });
 
-    const tokens = members.map((m) => m.fcmToken).filter((t): t is string => Boolean(t));
+    const tokens = members
+      .map((m) => m.fcmToken)
+      .filter((t): t is string => Boolean(t));
 
     if (tokens.length > 0 && this.firebaseInitialized) {
       try {
         const batchSize = 500;
-        for (let i = 0; i<tokens.length; i+=batchSize){
-          const batchTokens = tokens.slice(i, i+batchSize);
+        for (let i = 0; i < tokens.length; i += batchSize) {
+          const batchTokens = tokens.slice(i, i + batchSize);
           await getMessaging().sendEachForMulticast({
             tokens: batchTokens,
-            notification: {title, body},
+            notification: { title, body },
           });
         }
-        this.logger.log(`Multicast push sent to mess: ${messId} (${tokens.length} devices)`);
+        this.logger.log(
+          `Multicast push sent to mess: ${messId} (${tokens.length} devices)`,
+        );
       } catch (error) {
         this.logger.error(`Failed multicast push to mess: ${messId}`, error);
       }
@@ -117,4 +123,3 @@ export class NotificationService implements OnModuleInit {
     });
   }
 }
-

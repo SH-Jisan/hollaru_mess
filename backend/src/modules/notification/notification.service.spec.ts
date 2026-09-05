@@ -8,7 +8,9 @@ describe('NotificationService (Unit Tests)', () => {
   const mockPrismaService = {
     user: {
       update: jest.fn().mockResolvedValue({}),
-      findUnique: jest.fn().mockResolvedValue({ id: 'user_1', fcmToken: 'token_1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ id: 'user_1', fcmToken: 'token_1' }),
       findMany: jest.fn().mockResolvedValue([]),
     },
     notification: {

@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { ContextValidatorService } from '../../common/services/context-validator.service';
 import { MonthAlreadyActiveException } from '../../common/exceptions/domain.exception';
@@ -8,7 +12,6 @@ import { AppCacheService } from '../../common/cache/app-cache.service';
 import { CacheKeys } from '../../common/cache/cache-keys';
 import { CacheEvents } from '../../common/cache/cache-events.enum';
 
-
 @Injectable()
 export class BillingService {
   constructor(
@@ -16,7 +19,7 @@ export class BillingService {
     private validator: ContextValidatorService,
     private appCache: AppCacheService,
     private eventEmitter: EventEmitter2,
-    ) {}
+  ) {}
 
   // ১. নতুন মাসের সেশন শুরু করা (Only Manager)
   async startNewMonth(dto: StartMonthDto, managerId: string) {
@@ -47,12 +50,11 @@ export class BillingService {
 
     // 🔴 Invalidation: নতুন মাস শুরু হওয়ায় সামারির ক্যাশ ক্লিয়ার করা
     const cacheKey = `billing:${mess.id}:${month.id}:summary`;
-        // 📡 Event-Driven Cache Invalidation
+    // 📡 Event-Driven Cache Invalidation
     this.eventEmitter.emit(CacheEvents.BILLING_UPDATED, {
       messId: mess.id,
       monthId: month.id,
     });
-
 
     return month;
   }
@@ -60,7 +62,8 @@ export class BillingService {
   // ২. রিয়েল-টাইম মিল রেট এবং ফাইনাল সামারি হিসাব করা (Cache-Aside Pattern)
   async getMonthSummary(userId: string) {
     const { user, mess } = await this.validator.validateUserAndMess(userId);
-    if (!mess.currentMonthId) throw new NotFoundException('No active or previous month record found');
+    if (!mess.currentMonthId)
+      throw new NotFoundException('No active or previous month record found');
 
     const monthId = mess.currentMonthId;
     const cacheKey = CacheKeys.billingSummary(mess.id, monthId);
@@ -78,7 +81,10 @@ export class BillingService {
         select: { lunchCount: true, dinnerCount: true },
       });
 
-      const totalMeals = dailyLogs.reduce((sum, log) => sum + log.lunchCount + log.dinnerCount, 0);
+      const totalMeals = dailyLogs.reduce(
+        (sum, log) => sum + log.lunchCount + log.dinnerCount,
+        0,
+      );
       const mealRate = totalMeals > 0 ? totalBazaarCost / totalMeals : 0;
 
       const depositsGrouped = await this.prisma.deposit.groupBy({
@@ -88,7 +94,9 @@ export class BillingService {
       });
 
       const depositMap = new Map<string, number>();
-      depositsGrouped.forEach((dep) => depositMap.set(dep.userId, dep._sum.amount || 0));
+      depositsGrouped.forEach((dep) =>
+        depositMap.set(dep.userId, dep._sum.amount || 0),
+      );
 
       const members = await this.prisma.user.findMany({
         where: {
@@ -98,7 +106,13 @@ export class BillingService {
             { requests: { some: { log: { monthId } } } },
           ],
         },
-        select: { id: true, name: true, email: true, messId: true, leftAt: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          messId: true,
+          leftAt: true,
+        },
       });
 
       const memberSummaries = members.map((member) => {
@@ -153,7 +167,7 @@ export class BillingService {
 
     // 🔴 Invalidation: মাস বন্ধ হয়ে যাওয়ায় সামারির ক্যাশ ক্লিয়ার করা
     const cacheKey = `billing:${mess.id}:${monthId}:summary`;
-        // 📡 Event-Driven Cache Invalidation
+    // 📡 Event-Driven Cache Invalidation
     this.eventEmitter.emit(CacheEvents.BILLING_UPDATED, {
       messId: mess.id,
       monthId,

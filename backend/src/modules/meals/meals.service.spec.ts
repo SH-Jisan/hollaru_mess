@@ -1,3 +1,5 @@
+import { AppCacheService } from '../../common/cache/app-cache.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -11,7 +13,9 @@ describe('MealsService (Unit Tests)', () => {
 
   const mockPrismaService = {
     dailyLog: {
-      findUnique: jest.fn().mockResolvedValue({ id: '2026-07-23', monthId: 'month_1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ id: '2026-07-23', monthId: 'month_1' }),
       findFirst: jest.fn().mockResolvedValue(null),
     },
     mealRequest: {
@@ -48,6 +52,8 @@ describe('MealsService (Unit Tests)', () => {
         { provide: ContextValidatorService, useValue: mockContextValidator },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: getQueueToken('notification-queue'), useValue: mockQueue },
+        { provide: AppCacheService, useValue: { remember: jest.fn((k, ttl, fn) => fn()), del: jest.fn(), delMany: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

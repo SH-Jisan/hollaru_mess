@@ -56,7 +56,9 @@ async function bootstrap() {
   logger.log(`=======================================================`);
   logger.log(` 🚀 Server Listening  : http://localhost:${port}`);
   logger.log(` 📚 Swagger API Docs   : http://localhost:${port}/api/docs`);
-  logger.log(` 📊 Metrics Dashboard  : http://localhost:${port}/system/dashboard`);
+  logger.log(
+    ` 📊 Metrics Dashboard  : http://localhost:${port}/system/dashboard`,
+  );
   logger.log(` ⚡ Health Check API   : http://localhost:${port}/system/status`);
   logger.log(`=======================================================\n`);
 }

@@ -1,4 +1,9 @@
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
+import {
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+} from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
@@ -14,7 +19,7 @@ export class TransformInterceptor<T> implements NestInterceptor<T, any> {
     const response = context.switchToHttp().getResponse();
 
     return next.handle().pipe(
-      map(data => {
+      map((data) => {
         const url = request.url || '';
         const contentType = response.getHeader('content-type') || '';
 

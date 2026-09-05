@@ -1,4 +1,11 @@
-import { Controller, Get, Header, MessageEvent, Post, Sse } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  MessageEvent,
+  Post,
+  Sse,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -13,8 +20,13 @@ export class SystemController {
   constructor(private readonly systemService: SystemService) {}
 
   @Get('status')
-  @ApiOperation({ summary: 'Get live system memory, CPU, uptime, and DB metrics' })
-  @ApiResponse({ status: 200, description: 'Live system status metrics returned successfully' })
+  @ApiOperation({
+    summary: 'Get live system memory, CPU, uptime, and DB metrics',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Live system status metrics returned successfully',
+  })
   getSystemStatus() {
     return this.systemService.getSystemMetrics();
   }
@@ -33,16 +45,21 @@ export class SystemController {
 
   @Get('dashboard')
   @Header('Content-Type', 'text/html')
-  @ApiOperation({ summary: 'View Live System Status & API Performance Dashboard UI' })
+  @ApiOperation({
+    summary: 'View Live System Status & API Performance Dashboard UI',
+  })
   getDashboardUi(): string {
     return this.readFile('dashboard.html');
   }
 
   @Sse('events')
-  @ApiOperation({ summary: 'Stream live real-time metrics updates via Server-Sent Events (SSE)' })
+  @ApiOperation({
+    summary:
+      'Stream live real-time metrics updates via Server-Sent Events (SSE)',
+  })
   streamMetrics(): Observable<MessageEvent> {
     return MetricsInterceptor.getMetricsObservable().pipe(
-      map((data) => ({ data: JSON.stringify(data) } as MessageEvent)),
+      map((data) => ({ data: JSON.stringify(data) })),
     );
   }
 
@@ -59,7 +76,14 @@ export class SystemController {
   }
 
   private readFile(fileName: string): string {
-    const srcPath = path.join(process.cwd(), 'src', 'modules', 'system', 'dashboard_ui', fileName);
+    const srcPath = path.join(
+      process.cwd(),
+      'src',
+      'modules',
+      'system',
+      'dashboard_ui',
+      fileName,
+    );
     const distPath = path.join(__dirname, 'dashboard_ui', fileName);
 
     const filePath = fs.existsSync(srcPath) ? srcPath : distPath;

@@ -26,13 +26,19 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(req: Request, payload: { sub: string; email: string; role?: string; iat?: number }) {
+  async validate(
+    req: Request,
+    payload: { sub: string; email: string; role?: string; iat?: number },
+  ) {
     // ⚡ 1. Check if Access Token is Blacklisted in Redis
-    const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req) ||
-     req?.cookies?.accessToken;
+    const token =
+      ExtractJwt.fromAuthHeaderAsBearerToken()(req) ||
+      req?.cookies?.accessToken;
     if (token) {
       try {
-          const isBlacklisted = await this.cacheManager.get(CacheKeys.tokenBlacklist(token));
+        const isBlacklisted = await this.cacheManager.get(
+          CacheKeys.tokenBlacklist(token),
+        );
         if (isBlacklisted) {
           throw new UnauthorizedException('Token has been revoked/logged out');
         }
@@ -41,42 +47,44 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
     }
 
-     // ⚡ ২. Global Logout-All Devices Timestamp Check (All Devices Instant Invalidation)
+    // ⚡ ২. Global Logout-All Devices Timestamp Check (All Devices Instant Invalidation)
     if (payload.iat) {
       try {
-        const logoutAllTime = await this.cacheManager.get<number>(CacheKeys.logoutAll(payload.sub));
+        const logoutAllTime = await this.cacheManager.get<number>(
+          CacheKeys.logoutAll(payload.sub),
+        );
         if (logoutAllTime && payload.iat <= logoutAllTime) {
-          throw new UnauthorizedException('Session has been revoked by logout-all from another device');
+          throw new UnauthorizedException(
+            'Session has been revoked by logout-all from another device',
+          );
         }
       } catch (err) {
         if (err instanceof UnauthorizedException) throw err;
       }
     }
 
-      const cacheKey = CacheKeys.userProfile(payload.email);
+    const cacheKey = CacheKeys.userProfile(payload.email);
 
     let user: any = null;
     try {
       user = await this.cacheManager.get(cacheKey);
-    }
-    catch(err){
+    } catch (err) {
       user = null;
     }
 
     if (!user) {
       const dbUser = await this.prisma.user.findUnique({
-        where: {id: payload.sub},
+        where: { id: payload.sub },
       });
 
-      if(!dbUser){
+      if (!dbUser) {
         throw new UnauthorizedException('User no longer exists');
       }
-      const {hashedPassword, hashedRefreshToken, ...safeUser } = dbUser;
+      const { hashedPassword, hashedRefreshToken, ...safeUser } = dbUser;
       user = safeUser;
-      try{
+      try {
         await this.cacheManager.set(cacheKey, user, 900000);
-      }
-      catch(err){
+      } catch (err) {
         //ignore error
       }
     }

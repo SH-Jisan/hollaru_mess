@@ -34,7 +34,11 @@ export class AppCacheService {
 
   constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
-  private recordEvent(action: 'HIT' | 'MISS' | 'SET' | 'DEL', key: string, detail?: string) {
+  private recordEvent(
+    action: 'HIT' | 'MISS' | 'SET' | 'DEL',
+    key: string,
+    detail?: string,
+  ) {
     if (action === 'HIT') this.hits++;
     else if (action === 'MISS') this.misses++;
     else if (action === 'SET') this.sets++;
@@ -56,7 +60,10 @@ export class AppCacheService {
 
   public getTelemetry(): CacheTelemetry {
     const totalHitsAndMisses = this.hits + this.misses;
-    const hitRatio = totalHitsAndMisses > 0 ? Number(((this.hits / totalHitsAndMisses) * 100).toFixed(1)) : 100;
+    const hitRatio =
+      totalHitsAndMisses > 0
+        ? Number(((this.hits / totalHitsAndMisses) * 100).toFixed(1))
+        : 100;
     return {
       hits: this.hits,
       misses: this.misses,
@@ -84,7 +91,11 @@ export class AppCacheService {
       const cached = await this.cacheManager.get<T>(key);
       if (cached !== null && cached !== undefined) {
         if (Array.isArray(cached) && cached.length === 0) {
-          this.recordEvent('MISS', key, 'Empty array [] bypassed -> Refreshing DB');
+          this.recordEvent(
+            'MISS',
+            key,
+            'Empty array [] bypassed -> Refreshing DB',
+          );
         } else {
           this.recordEvent('HIT', key, 'Served from Redis cache');
           return cached;
@@ -94,7 +105,9 @@ export class AppCacheService {
       }
     } catch (err: any) {
       // 🛡️ রডিস ডাউন বা Upstash লিমিট ওভার হলেও অ্যাপ ক্র্যাশ করবে না
-      this.logger.warn(`Redis Cache Get Error [${key}]: ${err.message || err}. Degrading gracefully to DB.`);
+      this.logger.warn(
+        `Redis Cache Get Error [${key}]: ${err.message || err}. Degrading gracefully to DB.`,
+      );
     }
 
     // ২. ক্যাশে ডাটা না থাকলে ডাটাবেজ থেকে ডাটা আনা
@@ -104,9 +117,15 @@ export class AppCacheService {
     if (freshData !== null && freshData !== undefined) {
       try {
         await this.cacheManager.set(key, freshData, safeTtlMs);
-        this.recordEvent('SET', key, `Saved fresh data to Redis (TTL: ${Math.round(safeTtlMs / 1000)}s)`);
+        this.recordEvent(
+          'SET',
+          key,
+          `Saved fresh data to Redis (TTL: ${Math.round(safeTtlMs / 1000)}s)`,
+        );
       } catch (err: any) {
-        this.logger.warn(`Redis Cache Set Error [${key}]: ${err.message || err}.`);
+        this.logger.warn(
+          `Redis Cache Set Error [${key}]: ${err.message || err}.`,
+        );
       }
     }
 

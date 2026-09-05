@@ -4,10 +4,8 @@ import { MessController } from './mess.controller';
 import { MessService } from './mess.service';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({name: 'notification-queue'}),
-  ],
+  imports: [BullModule.registerQueue({ name: 'notification-queue' })],
   controllers: [MessController],
-  providers: [MessService]
+  providers: [MessService],
 })
-export class MessModule { }
+export class MessModule {}

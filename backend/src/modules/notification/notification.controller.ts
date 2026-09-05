@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SaveFcmTokenDto } from './dto/save-fcm-token.dto';
@@ -13,14 +26,21 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Post('fcm-token')
-  @ApiOperation({ summary: 'Save or update mobile device FCM Token for push notifications' })
+  @ApiOperation({
+    summary: 'Save or update mobile device FCM Token for push notifications',
+  })
   @ApiResponse({ status: 201, description: 'FCM Token saved.' })
-  saveFcmToken(@CurrentUser() user: { id: string }, @Body() dto: SaveFcmTokenDto) {
+  saveFcmToken(
+    @CurrentUser() user: { id: string },
+    @Body() dto: SaveFcmTokenDto,
+  ) {
     return this.notificationService.saveFcmToken(user.id, dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get in-app notifications history for logged in user' })
+  @ApiOperation({
+    summary: 'Get in-app notifications history for logged in user',
+  })
   @ApiResponse({ status: 200, description: 'Notifications returned.' })
   getUserNotifications(@CurrentUser() user: { id: string }) {
     return this.notificationService.getUserNotifications(user.id);

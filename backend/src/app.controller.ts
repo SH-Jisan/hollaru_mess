@@ -22,7 +22,9 @@ export class AppController {
   }
 
   @Get('health')
-  @ApiOperation({ summary: 'Health Check API for Render, Uptime Kuma, and Load Balancers' })
+  @ApiOperation({
+    summary: 'Health Check API for Render, Uptime Kuma, and Load Balancers',
+  })
   getHealth() {
     return {
       status: 'UP',
@@ -32,13 +34,14 @@ export class AppController {
     };
   }
 
-
   // ১. সাধারণ লগইন করা ইউজারদের জন্য সিকিউর রুট (MEMBER & MANAGER both)
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth() // Swagger-এ লক আইকন দেখানোর জন্য
   @ApiOperation({ summary: 'Get current logged in user details' })
-  getProfile(@CurrentUser() user: Omit<User, 'hashedPassword' | 'hashedRefreshToken'>) {
+  getProfile(
+    @CurrentUser() user: Omit<User, 'hashedPassword' | 'hashedRefreshToken'>,
+  ) {
     return user;
   }
 
@@ -48,14 +51,14 @@ export class AppController {
   @Roles(Role.MANAGER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Access manager-only dashboard test' })
-  async getManagerData(@CurrentUser() user: {messId: string}) {
+  async getManagerData(@CurrentUser() user: { messId: string }) {
     const mess = user.messId
-    ? await this.prisma.mess.findUnique({where: {id: user.messId}})
-    : null;
+      ? await this.prisma.mess.findUnique({ where: { id: user.messId } })
+      : null;
 
     return {
-       message: 'Welcome Manager! This is private mess management data.',
-       messCode: mess?.code || null,
-       };
+      message: 'Welcome Manager! This is private mess management data.',
+      messCode: mess?.code || null,
+    };
   }
 }

@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -20,7 +33,10 @@ export class BazaarController {
   @Post('item')
   @ApiOperation({ summary: 'Add a new item to the bazaar list' })
   @ApiResponse({ status: 201, description: 'Item added successfully.' })
-  createBazaarItem(@Body() dto: CreateBazaarItemDto, @CurrentUser() user: { id: string }) {
+  createBazaarItem(
+    @Body() dto: CreateBazaarItemDto,
+    @CurrentUser() user: { id: string },
+  ) {
     return this.bazaarService.createBazaarItem(dto, user.id);
   }
 
@@ -47,7 +63,10 @@ export class BazaarController {
   @Roles(Role.MANAGER) // শুধুমাত্র ম্যানেজাররা ডিপোজিট যোগ করতে পারবেন
   @ApiOperation({ summary: 'Log member deposit (Manager only)' })
   @ApiResponse({ status: 201, description: 'Deposit logged successfully.' })
-  addDeposit(@Body() dto: CreateDepositDto, @CurrentUser() user: { id: string }) {
+  addDeposit(
+    @Body() dto: CreateDepositDto,
+    @CurrentUser() user: { id: string },
+  ) {
     return this.bazaarService.addDeposit(dto, user.id);
   }
 }

@@ -1,3 +1,5 @@
+import { AppCacheService } from '../../common/cache/app-cache.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -10,10 +12,26 @@ describe('BillingService (Unit Tests)', () => {
   const mockPrismaService: any = {
     monthlyData: { create: jest.fn(), update: jest.fn() },
     mess: { update: jest.fn() },
-    bazaarItem: { aggregate: jest.fn().mockResolvedValue({ _sum: { cost: 6000 } }) },
-    dailyLog: { findMany: jest.fn().mockResolvedValue([{ lunchCount: 60, dinnerCount: 60 }]) },
-    deposit: { groupBy: jest.fn().mockResolvedValue([{ userId: 'user_1', _sum: { amount: 2000 } }]) },
-    user: { findMany: jest.fn().mockResolvedValue([{ id: 'user_1', name: 'Jisan', email: 'j@test.com' }]) },
+    bazaarItem: {
+      aggregate: jest.fn().mockResolvedValue({ _sum: { cost: 6000 } }),
+    },
+    dailyLog: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([{ lunchCount: 60, dinnerCount: 60 }]),
+    },
+    deposit: {
+      groupBy: jest
+        .fn()
+        .mockResolvedValue([{ userId: 'user_1', _sum: { amount: 2000 } }]),
+    },
+    user: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([
+          { id: 'user_1', name: 'Jisan', email: 'j@test.com' },
+        ]),
+    },
     $transaction: jest.fn((callback) => callback(mockPrismaService)),
   };
 
@@ -41,6 +59,8 @@ describe('BillingService (Unit Tests)', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ContextValidatorService, useValue: mockContextValidator },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
+        { provide: AppCacheService, useValue: { remember: jest.fn((k, ttl, fn) => fn()), del: jest.fn(), delMany: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 

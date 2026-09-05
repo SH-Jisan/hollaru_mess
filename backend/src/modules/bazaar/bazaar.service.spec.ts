@@ -1,3 +1,5 @@
+import { AppCacheService } from '../../common/cache/app-cache.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -10,7 +12,11 @@ describe('BazaarService (Unit Tests)', () => {
 
   const mockPrismaService = {
     bazaarItem: {
-      create: jest.fn().mockResolvedValue({ id: 'item_1', items: 'Rice, Chicken', status: 'PENDING' }),
+      create: jest.fn().mockResolvedValue({
+        id: 'item_1',
+        items: 'Rice, Chicken',
+        status: 'PENDING',
+      }),
       findMany: jest.fn().mockResolvedValue([]),
     },
     deposit: { create: jest.fn() },
@@ -43,11 +49,12 @@ describe('BazaarService (Unit Tests)', () => {
         { provide: ContextValidatorService, useValue: mockContextValidator },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: getQueueToken('notification-queue'), useValue: mockQueue },
+        { provide: AppCacheService, useValue: { remember: jest.fn((k, ttl, fn) => fn()), del: jest.fn(), delMany: jest.fn() } },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
     service = module.get<BazaarService>(BazaarService);
-
   });
 
   it('should create a bazaar item and add notification job to queue', async () => {
@@ -57,6 +64,9 @@ describe('BazaarService (Unit Tests)', () => {
     );
 
     expect(result).toHaveProperty('id', 'item_1');
-    expect(mockQueue.add).toHaveBeenCalledWith('send-mess-notification', expect.any(Object));
+    expect(mockQueue.add).toHaveBeenCalledWith(
+      'send-mess-notification',
+      expect.any(Object),
+    );
   });
 });

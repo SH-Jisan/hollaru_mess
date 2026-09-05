@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -22,7 +26,8 @@ export class BazaarService {
   ) {}
 
   async createBazaarItem(dto: CreateBazaarItemDto, userId: string) {
-    const { user, mess, activeMonthId } = await this.validator.validateUserMessAndActiveMonth(userId);
+    const { user, mess, activeMonthId } =
+      await this.validator.validateUserMessAndActiveMonth(userId);
 
     const item = await this.prisma.bazaarItem.create({
       data: {
@@ -48,12 +53,19 @@ export class BazaarService {
     return item;
   }
 
-  async completePurchase(itemId: string, dto: CompletePurchaseDto, userId: string) {
+  async completePurchase(
+    itemId: string,
+    dto: CompletePurchaseDto,
+    userId: string,
+  ) {
     const { user, mess } = await this.validator.validateUserAndMess(userId);
-    const item = await this.prisma.bazaarItem.findUnique({ where: { id: itemId } });
+    const item = await this.prisma.bazaarItem.findUnique({
+      where: { id: itemId },
+    });
 
     if (!item) throw new NotFoundException('Bazaar item not found');
-    if (item.status === 'COMPLETED') throw new BadRequestException('Purchase already completed');
+    if (item.status === 'COMPLETED')
+      throw new BadRequestException('Purchase already completed');
 
     const updatedItem = await this.prisma.bazaarItem.update({
       where: { id: itemId },
@@ -95,10 +107,14 @@ export class BazaarService {
     const { manager, mess } = await this.validator.validateManager(managerId);
 
     if (!mess.isMonthActive || !mess.currentMonthId) {
-      throw new BadRequestException('Active month summary session is not started');
+      throw new BadRequestException(
+        'Active month summary session is not started',
+      );
     }
 
-    const targetUser = await this.prisma.user.findUnique({ where: { id: dto.userId } });
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: dto.userId },
+    });
     if (!targetUser || targetUser.messId !== manager.messId) {
       throw new BadRequestException('User not found in your mess');
     }

@@ -100,26 +100,34 @@ model MealRequest {
 }
 
 model BazaarItem {
-  id           String        @id @default(uuid())
-  monthId      String
-  month        MonthlyData   @relation(fields: [monthId], references: [id], onDelete: Cascade)
-  items        String
-  cost         Float         @default(0.0)
-  status       String        @default("PENDING") // PENDING or COMPLETED
-  shopperId    String?
-  shopperName  String?
-  createdAt    DateTime      @default(now())
+  id              String        @id @default(uuid())
+  monthId         String
+  month           MonthlyData   @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  items           String
+  cost            Float         @default(0.0)
+  status          String        @default("PENDING") // PENDING, PENDING_APPROVAL, COMPLETED, REJECTED
+  shopperId       String?
+  shopperName     String?
+  rawText         String?
+  itemsDetail     Json?
+  depositAmount   Float?        @default(0.0)
+  depositId       String?
+  rejectionReason String?
+  createdAt       DateTime      @default(now())
 }
 
 model Deposit {
-  id         String          @id @default(uuid())
-  monthId    String
-  month      MonthlyData     @relation(fields: [monthId], references: [id], onDelete: Cascade)
-  userId     String
-  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount     Float
-  createdAt  DateTime        @default(now())
+  id            String          @id @default(uuid())
+  monthId       String
+  month         MonthlyData     @relation(fields: [monthId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount        Float
+  status        String          @default("APPROVED") // APPROVED, PENDING_APPROVAL, REJECTED
+  bazaarItemId  String?
+  createdAt     DateTime        @default(now())
 }
+
 
 model Notification {
   id        String   @id @default(uuid())

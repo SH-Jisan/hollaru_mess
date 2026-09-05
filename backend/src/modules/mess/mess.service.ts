@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Role } from '@prisma/client';
@@ -21,14 +25,20 @@ export class MessService {
     private appCache: AppCacheService,
     private eventEmitter: EventEmitter2,
     @InjectQueue('notification-queue') private notificationQueue: Queue,
-  ) { }
+  ) {}
 
   // ১. নতুন মেস তৈরি করা
   async createMess(dto: CreateMessDto, userId: string) {
     await this.validator.validateUserHasNoMess(userId);
 
-    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
-    const emailPart = user.email.split('@')[0].substring(0, 2).toUpperCase().padEnd(2, 'X');
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
+    const emailPart = user.email
+      .split('@')[0]
+      .substring(0, 2)
+      .toUpperCase()
+      .padEnd(2, 'X');
     const timePart = Date.now().toString(36).toUpperCase().slice(-4);
     const code = `MESS-${emailPart}${timePart}`;
 
@@ -54,7 +64,9 @@ export class MessService {
     });
 
     // 📡 Event-Driven Cache Invalidation
-    this.eventEmitter.emit(CacheEvents.USER_PROFILE_UPDATED, { email: user.email });
+    this.eventEmitter.emit(CacheEvents.USER_PROFILE_UPDATED, {
+      email: user.email,
+    });
 
     return { message: 'Mess created successfully', mess };
   }
@@ -82,14 +94,16 @@ export class MessService {
     });
 
     // 📡 Event-Driven Cache Invalidation
-    const manager = await this.prisma.user.findUnique({ where: { id: mess.managerId } });
+    const manager = await this.prisma.user.findUnique({
+      where: { id: mess.managerId },
+    });
     this.eventEmitter.emit(CacheEvents.MEMBER_JOINED, {
       messId: mess.id,
       memberEmail: updatedUser.email,
       managerEmail: manager?.email,
     });
 
-    return { message: 'Successfully joined the mess', messName: mess.name};
+    return { message: 'Successfully joined the mess', messName: mess.name };
   }
 
   // ৩. মেসের সব মেম্বারদের তালিকা দেখা (Cache-Aside Pattern)
@@ -150,20 +164,25 @@ export class MessService {
       monthId: mess.currentMonthId,
     });
 
-    return { message: 'Successfully left the mess',};
+    return { message: 'Successfully left the mess' };
   }
 
   // ৫. মেস ম্যানেজার পরিবর্তন ও প্রমোট করা (Transfer Manager Ownership)
   async transferManager(dto: TransferManagerDto, currentManagerId: string) {
-    const { manager, mess } = await this.validator.validateManager(currentManagerId);
+    const { manager, mess } =
+      await this.validator.validateManager(currentManagerId);
     if (dto.newManagerId === currentManagerId) {
-      throw new BadRequestException('You are already the manager of this mess.');
+      throw new BadRequestException(
+        'You are already the manager of this mess.',
+      );
     }
     const newManager = await this.prisma.user.findUnique({
       where: { id: dto.newManagerId },
     });
     if (!newManager || newManager.messId !== mess.id) {
-      throw new BadRequestException('The selected member does not belong to this mess.');
+      throw new BadRequestException(
+        'The selected member does not belong to this mess.',
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -199,6 +218,8 @@ export class MessService {
         body: `${newManager.name} is now the manager of ${mess.name}.`,
       });
     }
-    return { message: `Manager ownership successfully transferred to ${newManager.name}` };
+    return {
+      message: `Manager ownership successfully transferred to ${newManager.name}`,
+    };
   }
 }

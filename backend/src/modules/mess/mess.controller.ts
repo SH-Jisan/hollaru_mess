@@ -1,5 +1,10 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -15,20 +20,28 @@ import { MessService } from './mess.service';
 @UseGuards(JwtAuthGuard)
 @Controller('mess')
 export class MessController {
-  constructor(private readonly messService: MessService) { }
+  constructor(private readonly messService: MessService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new mess (Creator becomes MANAGER)' })
   @ApiResponse({ status: 201, description: 'Mess created successfully.' })
-  createMess(@Body() createMessDto: CreateMessDto, @CurrentUser() user: { id: string }) {
+  createMess(
+    @Body() createMessDto: CreateMessDto,
+    @CurrentUser() user: { id: string },
+  ) {
     return this.messService.createMess(createMessDto, user.id);
   }
 
   @Post('join')
-  @ApiOperation({ summary: 'Join an existing mess using a unique 4-digit code' })
+  @ApiOperation({
+    summary: 'Join an existing mess using a unique 4-digit code',
+  })
   @ApiResponse({ status: 201, description: 'Joined successfully.' })
   @ApiResponse({ status: 404, description: 'Mess code not found.' })
-  joinMess(@Body() joinMessDto: JoinMessDto, @CurrentUser() user: { id: string }) {
+  joinMess(
+    @Body() joinMessDto: JoinMessDto,
+    @CurrentUser() user: { id: string },
+  ) {
     return this.messService.joinMess(joinMessDto, user.id);
   }
 
@@ -42,18 +55,29 @@ export class MessController {
   @Post('leave')
   @ApiOperation({ summary: 'Leave current mess' })
   @ApiResponse({ status: 200, description: 'Left mess successfully.' })
-  @ApiResponse({ status: 400, description: 'User not in mess or manager cannot leave.' })
+  @ApiResponse({
+    status: 400,
+    description: 'User not in mess or manager cannot leave.',
+  })
   leaveMess(@CurrentUser() user: { id: string }) {
     return this.messService.leaveMess(user.id);
   }
 
-
   @Post('transfer-manager')
   @UseGuards(RolesGuard)
   @Roles(Role.MANAGER)
-  @ApiOperation({ summary: 'Transfer manager ownership to another member (Manager Only)' })
-  @ApiResponse({ status: 200, description: 'Manager transferred successfully & notification sent to all members.' })
-  transferManager(@Body() dto: TransferManagerDto, @CurrentUser() user: { id: string }) {
+  @ApiOperation({
+    summary: 'Transfer manager ownership to another member (Manager Only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Manager transferred successfully & notification sent to all members.',
+  })
+  transferManager(
+    @Body() dto: TransferManagerDto,
+    @CurrentUser() user: { id: string },
+  ) {
     return this.messService.transferManager(dto, user.id);
   }
 }

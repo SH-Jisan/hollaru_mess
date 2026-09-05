@@ -4,6 +4,6 @@ import { BazaarService } from './bazaar.service';
 
 @Module({
   controllers: [BazaarController],
-  providers: [BazaarService]
+  providers: [BazaarService],
 })
 export class BazaarModule {}

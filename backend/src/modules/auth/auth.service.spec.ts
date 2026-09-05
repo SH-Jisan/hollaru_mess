@@ -11,11 +11,15 @@ describe('AuthService (Unit Tests)', () => {
   let service: AuthService;
   let prisma: PrismaService;
 
-  const mockPrismaService = {
+  const mockPrismaService: any = {
+    $transaction: jest.fn((callback) => callback(mockPrismaService)),
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+    },
+    notification: {
+      create: jest.fn().mockResolvedValue({}),
     },
   };
 
@@ -56,10 +60,12 @@ describe('AuthService (Unit Tests)', () => {
     jest.clearAllMocks();
   });
 
-
   describe('register', () => {
     it('should throw ConflictException if email is already registered', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue({ id: 'user_1', email: 'test@test.com' });
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user_1',
+        email: 'test@test.com',
+      });
 
       await expect(
         service.register({

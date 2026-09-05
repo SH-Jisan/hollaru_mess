@@ -1,18 +1,18 @@
-import { 
-  Body, 
-  Controller, 
-  HttpCode, 
-  HttpStatus, 
-  Post, 
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
   Req,
-  Res, 
-  UseGuards 
+  Res,
+  UseGuards,
 } from '@nestjs/common';
-import { 
-  ApiBearerAuth, 
-  ApiOperation, 
-  ApiResponse, 
-  ApiTags 
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
@@ -29,23 +29,29 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  @Throttle({ default: { limit: 5, ttl: 60000 }})
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Register a new mess member' })
   @ApiResponse({ status: 201, description: 'User successfully registered.' })
   @ApiResponse({ status: 409, description: 'Email already exists.' })
-  async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) res: Response) {
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.authService.register(registerDto);
     this.setRefreshTokenCookie(res, result.refreshToken);
     return result;
   }
 
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 }})
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login user with email and password' })
   @ApiResponse({ status: 200, description: 'User successfully logged in.' })
   @ApiResponse({ status: 401, description: 'Invalid credentials.' })
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const result = await this.authService.login(loginDto);
     this.setRefreshTokenCookie(res, result.refreshToken);
     return result;
@@ -55,12 +61,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access and refresh tokens' })
   @ApiResponse({ status: 200, description: 'Tokens successfully refreshed.' })
-  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token.' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid or expired refresh token.',
+  })
   refresh(@Body() refreshDto: RefreshDto) {
     return this.authService.refresh(refreshDto);
   }
 
-    @Post('logout')
+  @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
@@ -99,7 +108,6 @@ export class AuthController {
     });
     return this.authService.logoutAllDevices(user.id, user.email, authHeader);
   }
-
 
   private setRefreshTokenCookie(res: Response, refreshToken: string) {
     res.cookie('refreshToken', refreshToken, {

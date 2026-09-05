@@ -27,7 +27,6 @@ export interface RouteMetric {
 }
 import { CacheKeys } from '../cache/cache-keys';
 
-
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
   private static metricsMap = new Map<string, RouteMetric>();
@@ -54,7 +53,10 @@ export class MetricsInterceptor implements NestInterceptor {
         const endMem = process.memoryUsage().heapUsed;
         const endCpu = process.cpuUsage(startCpu);
 
-        const ramDelta = Math.max(0.01, Number(((endMem - startMem) / 1024 / 1024).toFixed(2)));
+        const ramDelta = Math.max(
+          0.01,
+          Number(((endMem - startMem) / 1024 / 1024).toFixed(2)),
+        );
         const cpuMs = Number(((endCpu.user + endCpu.system) / 1000).toFixed(2));
         const statusCode = response.statusCode;
         const isSuccess = statusCode >= 200 && statusCode < 400;
@@ -82,34 +84,44 @@ export class MetricsInterceptor implements NestInterceptor {
 
         existing.lastLatencyMs = duration;
         existing.totalLatencyMs += duration;
-        existing.averageLatencyMs = Number((existing.totalLatencyMs / existing.totalRequests).toFixed(2));
+        existing.averageLatencyMs = Number(
+          (existing.totalLatencyMs / existing.totalRequests).toFixed(2),
+        );
 
-        existing.totalRamMb = Number((existing.totalRamMb + ramDelta).toFixed(2));
-        existing.averageRamMb = Number((existing.totalRamMb / existing.totalRequests).toFixed(2));
+        existing.totalRamMb = Number(
+          (existing.totalRamMb + ramDelta).toFixed(2),
+        );
+        existing.averageRamMb = Number(
+          (existing.totalRamMb / existing.totalRequests).toFixed(2),
+        );
 
         existing.totalCpuMs = Number((existing.totalCpuMs + cpuMs).toFixed(2));
-        existing.averageCpuMs = Number((existing.totalCpuMs / existing.totalRequests).toFixed(2));
+        existing.averageCpuMs = Number(
+          (existing.totalCpuMs / existing.totalRequests).toFixed(2),
+        );
         existing.lastRequestedAt = new Date().toISOString();
 
         MetricsInterceptor.metricsMap.set(metricKey, existing);
 
         // ⚡ 1. Real-time Instant SSE Stream Event Fire (Exclude internal system routes from event recursion)
         if (!path.startsWith('/system')) {
-          MetricsInterceptor.metricsSubject.next(MetricsInterceptor.getMetricsList());
+          MetricsInterceptor.metricsSubject.next(
+            MetricsInterceptor.getMetricsList(),
+          );
         }
 
         // ⚡ ২. Upstash Redis-এ ৩০ দিনের TTL (2592000 seconds) দিয়ে সেভ করা
         try {
           const now = Date.now();
-          const lastSync = MetricsInterceptor.lastRedisSyncMap.get(metricKey) || 0;
-          if (now - lastSync > 60000){
-          MetricsInterceptor.lastRedisSyncMap.set(metricKey, now);
-          const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
-          const redisKey = CacheKeys.monthlyMetrics(currentMonth, metricKey);
-          const ttlMs = 30 * 24 * 60 * 60 * 1000; // 30 Days Auto Expiration
-          await this.cacheManager.set(redisKey, existing, ttlMs);
+          const lastSync =
+            MetricsInterceptor.lastRedisSyncMap.get(metricKey) || 0;
+          if (now - lastSync > 60000) {
+            MetricsInterceptor.lastRedisSyncMap.set(metricKey, now);
+            const currentMonth = new Date().toISOString().slice(0, 7); // e.g. "2026-07"
+            const redisKey = CacheKeys.monthlyMetrics(currentMonth, metricKey);
+            const ttlMs = 30 * 24 * 60 * 60 * 1000; // 30 Days Auto Expiration
+            await this.cacheManager.set(redisKey, existing, ttlMs);
           }
-          
         } catch (err) {
           // Redis Exception Handling
         }
@@ -117,7 +129,9 @@ export class MetricsInterceptor implements NestInterceptor {
     );
   }
 
-  static initializeRegisteredRoutes(routes: Array<{ method: string; path: string }>) {
+  static initializeRegisteredRoutes(
+    routes: Array<{ method: string; path: string }>,
+  ) {
     routes.forEach(({ method, path }) => {
       const metricKey = `${method}:${path}`;
       if (!MetricsInterceptor.metricsMap.has(metricKey)) {
@@ -144,7 +158,7 @@ export class MetricsInterceptor implements NestInterceptor {
     return Array.from(MetricsInterceptor.metricsMap.values());
   }
 
-  static getMetricsObservable(): Observable<RouteMetric[]>{
+  static getMetricsObservable(): Observable<RouteMetric[]> {
     return MetricsInterceptor.metricsSubject.asObservable();
   }
 }

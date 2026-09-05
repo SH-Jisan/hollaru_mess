@@ -20,7 +20,10 @@ export class UpdateMealDto {
   @IsEnum(RequestCategory)
   category: RequestCategory;
 
-  @ApiProperty({ example: 1, description: 'Count to decrement (OFF) or increment (GUEST)' })
+  @ApiProperty({
+    example: 1,
+    description: 'Count to decrement (OFF) or increment (GUEST)',
+  })
   @IsInt()
   @Min(1)
   count: number;

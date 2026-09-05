@@ -1,3 +1,4 @@
+import { AppCacheService } from '../../common/cache/app-cache.service';
 import { getQueueToken } from '@nestjs/bullmq';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { HttpAdapterHost } from '@nestjs/core';
@@ -13,6 +14,7 @@ describe('SystemService (Unit Tests)', () => {
   };
 
   const mockQueue = {
+    getJobCounts: jest.fn().mockResolvedValue({ waiting: 0, active: 1, completed: 10, failed: 0 }),
     getWaitingCount: jest.fn().mockResolvedValue(0),
     getActiveCount: jest.fn().mockResolvedValue(1),
     getCompletedCount: jest.fn().mockResolvedValue(10),
@@ -46,6 +48,7 @@ describe('SystemService (Unit Tests)', () => {
         { provide: HttpAdapterHost, useValue: mockAdapterHost },
         { provide: CACHE_MANAGER, useValue: mockCacheManager }, // 👈 CACHE_MANAGER মক ইনজেক্ট করা হয়েছে
         { provide: getQueueToken('notification-queue'), useValue: mockQueue },
+        { provide: AppCacheService, useValue: { getTelemetry: jest.fn().mockReturnValue({ hits: 0, misses: 0, sets: 0, deletions: 0, totalOps: 0, hitRatio: 100, recentEvents: [] }), remember: jest.fn((k, ttl, fn) => fn()), del: jest.fn(), delMany: jest.fn() } },
       ],
     }).compile();
 

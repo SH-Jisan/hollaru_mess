@@ -50,9 +50,15 @@ export class SystemService {
   // =========================================================================
   async clearSystemCache(type?: string) {
     try {
-      SystemService.addLog('WARN', `Manual Cache Clear Triggered [${type || 'ALL'}]`);
+      SystemService.addLog(
+        'WARN',
+        `Manual Cache Clear Triggered [${type || 'ALL'}]`,
+      );
       await this.appCache.del(`* (Manual Cache Flush [${type || 'ALL'}])`);
-      return { success: true, message: `System Cache [${type || 'ALL'}] successfully invalidated` };
+      return {
+        success: true,
+        message: `System Cache [${type || 'ALL'}] successfully invalidated`,
+      };
     } catch (err: any) {
       SystemService.addLog('ERROR', `Cache Clear Failed: ${err.message}`);
       return { success: false, message: err.message };
@@ -65,8 +71,15 @@ export class SystemService {
       for (const job of failedJobs) {
         await job.retry();
       }
-      SystemService.addLog('LOG', `Retried ${failedJobs.length} failed BullMQ background jobs`);
-      return { success: true, count: failedJobs.length, message: `Retried ${failedJobs.length} failed jobs` };
+      SystemService.addLog(
+        'LOG',
+        `Retried ${failedJobs.length} failed BullMQ background jobs`,
+      );
+      return {
+        success: true,
+        count: failedJobs.length,
+        message: `Retried ${failedJobs.length} failed jobs`,
+      };
     } catch (err: any) {
       SystemService.addLog('ERROR', `Queue Retry Failed: ${err.message}`);
       return { success: false, message: err.message };
@@ -78,7 +91,9 @@ export class SystemService {
   // =========================================================================
   @Cron('0 0 1 * *')
   async handleMonthlyMetricsCycle() {
-    this.logger.log('🔄 Executing Monthly System Metrics Rollup & Archival to Supabase...');
+    this.logger.log(
+      '🔄 Executing Monthly System Metrics Rollup & Archival to Supabase...',
+    );
     try {
       const metricsList = MetricsInterceptor.getMetricsList();
       if (!metricsList || metricsList.length === 0) return;
@@ -103,7 +118,10 @@ export class SystemService {
       const summaryRedisKey = `metrics:summary:monthly:${monthKey}`;
       await this.cacheManager.set(summaryRedisKey, metricsList, 0);
 
-      SystemService.addLog('LOG', `Saved 1-Month Metric Rollup for [${monthKey}]`);
+      SystemService.addLog(
+        'LOG',
+        `Saved 1-Month Metric Rollup for [${monthKey}]`,
+      );
     } catch (err: any) {
       SystemService.addLog('ERROR', `Monthly Rollup Failed: ${err.message}`);
     }
@@ -113,7 +131,10 @@ export class SystemService {
   async handleHalfYearlyMetricsCycle() {
     try {
       const now = new Date();
-      const halfKey = now.getMonth() < 6 ? `${now.getFullYear()}-H1` : `${now.getFullYear()}-H2`;
+      const halfKey =
+        now.getMonth() < 6
+          ? `${now.getFullYear()}-H1`
+          : `${now.getFullYear()}-H2`;
       const metricsList = MetricsInterceptor.getMetricsList();
 
       await this.prisma.systemMetricSummary.createMany({
@@ -129,7 +150,10 @@ export class SystemService {
         })),
       });
 
-      SystemService.addLog('LOG', `Saved 6-Month Macro Metric Rollup for [${halfKey}]`);
+      SystemService.addLog(
+        'LOG',
+        `Saved 6-Month Macro Metric Rollup for [${halfKey}]`,
+      );
     } catch (err: any) {
       SystemService.addLog('ERROR', `6-Month Rollup Failed: ${err.message}`);
     }
@@ -154,7 +178,10 @@ export class SystemService {
         })),
       });
 
-      SystemService.addLog('LOG', `Saved Annual Metric Rollup for [${lastYear}]`);
+      SystemService.addLog(
+        'LOG',
+        `Saved Annual Metric Rollup for [${lastYear}]`,
+      );
     } catch (err: any) {
       SystemService.addLog('ERROR', `Annual Rollup Failed: ${err.message}`);
     }
@@ -168,7 +195,9 @@ export class SystemService {
     const memoryUsage = process.memoryUsage();
     const systemTotalMemory = os.totalmem();
     const systemFreeMemory = os.freemem();
-    const heapPercent = Number(((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100).toFixed(1));
+    const heapPercent = Number(
+      ((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100).toFixed(1),
+    );
 
     const dbStartTime = Date.now();
     let dbStatus = 'HEALTHY';
@@ -182,7 +211,12 @@ export class SystemService {
 
     let queueMetrics = { waiting: 0, active: 0, completed: 0, failed: 0 };
     try {
-      const counts = await this.notificationQueue.getJobCounts('waiting', 'active', 'completed', 'failed');
+      const counts = await this.notificationQueue.getJobCounts(
+        'waiting',
+        'active',
+        'completed',
+        'failed',
+      );
       queueMetrics = {
         waiting: counts.waiting || 0,
         active: counts.active || 0,
@@ -197,10 +231,24 @@ export class SystemService {
     if (heapPercent > 85) healthScore -= 20;
 
     const apiMetrics = MetricsInterceptor.getMetricsList();
-    const totalSystemRequests = apiMetrics.reduce((sum, item) => sum + item.totalRequests, 0);
-    const totalSuccessfulRequests = apiMetrics.reduce((sum, item) => sum + item.successfulRequests, 0);
-    const totalFailedRequests = apiMetrics.reduce((sum, item) => sum + item.failedRequests, 0);
-    const successRate = totalSystemRequests > 0 ? Number(((totalSuccessfulRequests / totalSystemRequests) * 100).toFixed(1)) : 100;
+    const totalSystemRequests = apiMetrics.reduce(
+      (sum, item) => sum + item.totalRequests,
+      0,
+    );
+    const totalSuccessfulRequests = apiMetrics.reduce(
+      (sum, item) => sum + item.successfulRequests,
+      0,
+    );
+    const totalFailedRequests = apiMetrics.reduce(
+      (sum, item) => sum + item.failedRequests,
+      0,
+    );
+    const successRate =
+      totalSystemRequests > 0
+        ? Number(
+            ((totalSuccessfulRequests / totalSystemRequests) * 100).toFixed(1),
+          )
+        : 100;
 
     return {
       status: 'OK',
@@ -221,8 +269,10 @@ export class SystemService {
         heapTotalMb: (memoryUsage.heapTotal / 1024 / 1024).toFixed(2),
         heapUsedMb: (memoryUsage.heapUsed / 1024 / 1024).toFixed(2),
         heapPercent,
-        systemTotalRamGb: (systemTotalMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
-        systemFreeRamGb: (systemFreeMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
+        systemTotalRamGb:
+          (systemTotalMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
+        systemFreeRamGb:
+          (systemFreeMemory / 1024 / 1024 / 1024).toFixed(2) + ' GB',
       },
       cpu: {
         cores: os.cpus().length,
