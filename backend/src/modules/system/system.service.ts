@@ -8,6 +8,7 @@ import { Queue } from 'bullmq';
 import * as os from 'os';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { MetricsInterceptor } from '../../common/interceptors/metrics.interceptors';
+import { AppCacheService } from '../../common/cache/app-cache.service';
 
 export interface LogEntry {
   time: string;
@@ -25,6 +26,7 @@ export class SystemService {
     private adapterHost: HttpAdapterHost,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     @InjectQueue('notification-queue') private notificationQueue: Queue,
+    private appCache: AppCacheService,
   ) {
     SystemService.addLog('LOG', 'System Observability Engine Initialized');
   }
@@ -49,6 +51,7 @@ export class SystemService {
   async clearSystemCache(type?: string) {
     try {
       SystemService.addLog('WARN', `Manual Cache Clear Triggered [${type || 'ALL'}]`);
+      await this.appCache.del(`* (Manual Cache Flush [${type || 'ALL'}])`);
       return { success: true, message: `System Cache [${type || 'ALL'}] successfully invalidated` };
     } catch (err: any) {
       SystemService.addLog('ERROR', `Cache Clear Failed: ${err.message}`);
@@ -232,6 +235,7 @@ export class SystemService {
         latencyValue: dbLatencyMs,
       },
       queue: queueMetrics,
+      cacheTelemetry: this.appCache.getTelemetry(),
       trafficSummary: {
         totalRequests: totalSystemRequests,
         successfulRequests: totalSuccessfulRequests,

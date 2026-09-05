@@ -6,6 +6,8 @@ let routeHistoryMap = new Map();
 let systemLogs = [];
 let selectedLogLevel = 'ALL';
 let openAccordionKeys = new Set();
+let cacheEvents = [];
+let selectedCacheAction = 'ALL';
 
 // =========================================================================
 // 🎨 Standalone Enterprise Native HTML5 Canvas Engine (0 External Dependencies)
@@ -226,6 +228,27 @@ async function fetchMetrics() {
       renderTerminalLogs();
     }
 
+    // 3.5 Render Redis Cache Telemetry
+    if (data.cacheTelemetry) {
+      const ct = data.cacheTelemetry;
+      if (document.getElementById('redisStatusVal')) {
+        document.getElementById('redisStatusVal').innerText = `${ct.hitRatio}% Hit Ratio`;
+      }
+      if (document.getElementById('redisSubVal')) {
+        document.getElementById('redisSubVal').innerText = `Hits: ${ct.hits} | Miss: ${ct.misses} | Sets: ${ct.sets}`;
+      }
+      if (document.getElementById('cacheHitCount')) document.getElementById('cacheHitCount').innerText = ct.hits;
+      if (document.getElementById('cacheMissCount')) document.getElementById('cacheMissCount').innerText = ct.misses;
+      if (document.getElementById('cacheSetCount')) document.getElementById('cacheSetCount').innerText = ct.sets;
+      if (document.getElementById('cacheDelCount')) document.getElementById('cacheDelCount').innerText = ct.deletions;
+      if (document.getElementById('cacheRatioBadge')) {
+        document.getElementById('cacheRatioBadge').innerText = `Hit Ratio: ${ct.hitRatio}% (${ct.totalOps} Ops)`;
+      }
+
+      cacheEvents = ct.recentEvents || [];
+      renderCacheEvents();
+    }
+
     // 4. Update Insights & Routes
     rawMetrics = data.apiMetrics || [];
     updateInsightsPanel(rawMetrics);
@@ -266,6 +289,48 @@ function filterLogs(level, btnEl) {
 function clearTerminalLogs() {
   systemLogs = [];
   renderTerminalLogs();
+}
+
+// Redis Cache Live Events Renderer
+function renderCacheEvents() {
+  const container = document.getElementById('cacheEventsLogs');
+  if (!container) return;
+
+  const searchInput = document.getElementById('cacheSearchInput');
+  const searchTerm = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+  const filtered = cacheEvents.filter((e) => {
+    const matchAction = selectedCacheAction === 'ALL' || e.action === selectedCacheAction;
+    const matchSearch = !searchTerm || e.key.toLowerCase().includes(searchTerm) || (e.detail && e.detail.toLowerCase().includes(searchTerm));
+    return matchAction && matchSearch;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); padding:10px;">No cache events matching filter.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered
+    .map(
+      (e) => `
+      <div class="cache-row">
+        <span class="cache-badge cache-badge-${e.action}">${e.action}</span>
+        <span class="cache-time">[${e.time}]</span>
+        <span class="cache-key">${e.key}</span>
+        <span class="cache-detail">${e.detail || ''}</span>
+      </div>`,
+    )
+    .join('');
+}
+
+function filterCacheEvents(action, btnEl) {
+  selectedCacheAction = action;
+  const container = document.getElementById('cacheFilterButtons');
+  if (container) {
+    container.querySelectorAll('.terminal-btn').forEach((b) => b.classList.remove('active'));
+  }
+  if (btnEl) btnEl.classList.add('active');
+  renderCacheEvents();
 }
 
 // Manual Cache & Queue Actions
@@ -549,6 +614,8 @@ window.closeSandboxModal = closeSandboxModal;
 window.executeApiTest = executeApiTest;
 window.fetchMetrics = fetchMetrics;
 window.exportMetricsJson = exportMetricsJson;
+window.renderCacheEvents = renderCacheEvents;
+window.filterCacheEvents = filterCacheEvents;
 
 // ⚡ 🌐 Direct Professional DOM Event Listener Attachments for ALL Dashboard Buttons
 function setupDomEventListeners() {
@@ -586,8 +653,8 @@ function setupDomEventListeners() {
     });
   });
 
-  // 4. Terminal Log Filter Buttons (.terminal-header .terminal-btn)
-  document.querySelectorAll('.terminal-header .terminal-btn').forEach((btn) => {
+  // 4. Terminal Log Filter Buttons (.terminal-header .terminal-btn:not(.cache-btn))
+  document.querySelectorAll('.terminal-header .terminal-btn:not(.cache-btn)').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       const text = e.currentTarget.innerText.trim();
       if (text.includes('Clear')) {
@@ -595,6 +662,15 @@ function setupDomEventListeners() {
       } else {
         filterLogs(text, e.currentTarget);
       }
+    });
+  });
+
+  // 4.5 Redis Cache Filter Buttons (#cacheFilterButtons .cache-btn)
+  document.querySelectorAll('#cacheFilterButtons .cache-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const text = e.currentTarget.innerText.trim();
+      const action = text.includes('HIT') ? 'HIT' : text.includes('MISS') ? 'MISS' : text.includes('SET') ? 'SET' : text.includes('DEL') ? 'DEL' : 'ALL';
+      filterCacheEvents(action, e.currentTarget);
     });
   });
 
