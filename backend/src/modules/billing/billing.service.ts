@@ -89,7 +89,7 @@ export class BillingService {
 
       const depositsGrouped = await this.prisma.deposit.groupBy({
         by: ['userId'],
-        where: { monthId },
+        where: { monthId, status: 'APPROVED' },
         _sum: { amount: true },
       });
 
