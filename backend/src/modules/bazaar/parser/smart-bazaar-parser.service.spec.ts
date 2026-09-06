@@ -7,7 +7,10 @@ import { ParsedBazaarResult } from './parser.interface';
 describe('SmartBazaarParserService (Self-Learning Dual Engine)', () => {
   let service: SmartBazaarParserService;
   let mockAiParser: { parse: jest.Mock };
-  let mockPatternMemory: { getLearnedItems: jest.Mock; learnPattern: jest.Mock };
+  let mockPatternMemory: {
+    getLearnedItems: jest.Mock;
+    learnPattern: jest.Mock;
+  };
 
   beforeEach(async () => {
     mockAiParser = {
@@ -28,7 +31,7 @@ describe('SmartBazaarParserService (Self-Learning Dual Engine)', () => {
         engineUsed: 'TIER2_AI',
         confidence: 0.95,
         warnings: [],
-      } as ParsedBazaarResult),
+      }),
     };
 
     mockPatternMemory = {

@@ -59,7 +59,14 @@ describe('BillingService (Unit Tests)', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ContextValidatorService, useValue: mockContextValidator },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
-        { provide: AppCacheService, useValue: { remember: jest.fn((k, ttl, fn) => fn()), del: jest.fn(), delMany: jest.fn() } },
+        {
+          provide: AppCacheService,
+          useValue: {
+            remember: jest.fn((k, ttl, fn) => fn()),
+            del: jest.fn(),
+            delMany: jest.fn(),
+          },
+        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();

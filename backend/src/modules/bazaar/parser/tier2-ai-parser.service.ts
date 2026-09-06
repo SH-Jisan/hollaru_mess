@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IBazaarParser, ParsedBazaarItem, ParsedBazaarResult } from './parser.interface';
+import {
+  IBazaarParser,
+  ParsedBazaarItem,
+  ParsedBazaarResult,
+} from './parser.interface';
 import { FuzzyNormalizer } from './fuzzy-normalizer';
 
 @Injectable()
@@ -9,13 +13,18 @@ export class Tier2AiParserService implements IBazaarParser {
 
   constructor(private configService: ConfigService) {}
 
-  async parse(rawText: string, managerName?: string): Promise<ParsedBazaarResult> {
+  async parse(
+    rawText: string,
+    managerName?: string,
+  ): Promise<ParsedBazaarResult> {
     const apiKey =
       this.configService.get<string>('GEMINI_API_KEY') ||
       process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-      this.logger.warn('GEMINI_API_KEY is not configured in .env. Skipping AI parse.');
+      this.logger.warn(
+        'GEMINI_API_KEY is not configured in .env. Skipping AI parse.',
+      );
       return {
         depositAmount: 0,
         items: [],
@@ -192,7 +201,11 @@ Output:
             contents: [
               {
                 role: 'user',
-                parts: [{ text: `${systemPrompt}${managerDirective}\n\nUser Notes:\n${rawText}` }],
+                parts: [
+                  {
+                    text: `${systemPrompt}${managerDirective}\n\nUser Notes:\n${rawText}`,
+                  },
+                ],
               },
             ],
             generationConfig: {
@@ -213,30 +226,44 @@ Output:
 
       const parsedJson = JSON.parse(contentText);
 
-      const items: ParsedBazaarItem[] = (parsedJson.items || []).map((item: any) => {
-        const normalized = FuzzyNormalizer.normalize(item.originalName || item.name || 'Unknown');
-        const finalName = item.name && item.name.includes('(')
-          ? item.name
-          : normalized.confidence >= 0.9
-            ? normalized.canonicalName
-            : (item.name || normalized.canonicalName);
+      const items: ParsedBazaarItem[] = (parsedJson.items || []).map(
+        (item: any) => {
+          const normalized = FuzzyNormalizer.normalize(
+            item.originalName || item.name || 'Unknown',
+          );
+          const finalName =
+            item.name && item.name.includes('(')
+              ? item.name
+              : normalized.confidence >= 0.9
+                ? normalized.canonicalName
+                : item.name || normalized.canonicalName;
 
-        return {
-          name: finalName,
-          originalName: item.originalName || item.name || 'Unknown',
-          quantity: typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1,
-          unit: item.unit || normalized.defaultUnit,
-          cost: typeof item.cost === 'number' ? item.cost : 0,
-          confidence: 0.95,
-        };
-      });
+          return {
+            name: finalName,
+            originalName: item.originalName || item.name || 'Unknown',
+            quantity:
+              typeof item.quantity === 'number' && item.quantity > 0
+                ? item.quantity
+                : 1,
+            unit: item.unit || normalized.defaultUnit,
+            cost: typeof item.cost === 'number' ? item.cost : 0,
+            confidence: 0.95,
+          };
+        },
+      );
 
       const totalCost = items.reduce((sum, item) => sum + item.cost, 0);
 
       // Multi-member deposit parsing (supports both positive and negative deposits/withdrawals)
       const memberDeposits = Array.isArray(parsedJson.memberDeposits)
         ? parsedJson.memberDeposits
-            .filter((m: any) => m && m.memberName && typeof m.amount === 'number' && m.amount !== 0)
+            .filter(
+              (m: any) =>
+                m &&
+                m.memberName &&
+                typeof m.amount === 'number' &&
+                m.amount !== 0,
+            )
             .map((m: any) => ({
               memberName: String(m.memberName).trim(),
               amount: Number(m.amount),
@@ -245,10 +272,14 @@ Output:
 
       // Calculate total net deposit amount
       const totalDeposit =
-        typeof parsedJson.depositAmount === 'number' && parsedJson.depositAmount !== 0
+        typeof parsedJson.depositAmount === 'number' &&
+        parsedJson.depositAmount !== 0
           ? parsedJson.depositAmount
           : memberDeposits && memberDeposits.length > 0
-            ? memberDeposits.reduce((sum: number, m: { amount: number }) => sum + m.amount, 0)
+            ? memberDeposits.reduce(
+                (sum: number, m: { amount: number }) => sum + m.amount,
+                0,
+              )
             : 0;
 
       return {
@@ -259,7 +290,10 @@ Output:
         engineUsed: 'TIER2_AI',
         confidence: 0.95,
         warnings: parsedJson.warnings || [],
-        memberDeposits: memberDeposits && memberDeposits.length > 0 ? memberDeposits : undefined,
+        memberDeposits:
+          memberDeposits && memberDeposits.length > 0
+            ? memberDeposits
+            : undefined,
       };
     } catch (err: any) {
       this.logger.error(`Tier 2 AI Parser Error: ${err.message}`);

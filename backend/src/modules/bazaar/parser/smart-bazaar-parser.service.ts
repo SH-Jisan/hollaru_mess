@@ -20,7 +20,11 @@ export class SmartBazaarParserService implements IBazaarParser {
    * ২. যদি কনফিডেন্স >= ৯০% হয় এবং কোনো আনপার্সড লাইন না থাকে, তবে এআই কল সম্পূর্ণ বাইপাস হবে।
    * ৩. কনফিডেন্স < ৯০% হলে Tier 2 AI চালিত হবে এবং প্রাপ্ত নতুন শব্দগুলো মেমোরিতে সেভ হবে।
    */
-  async parse(rawText: string, messId?: string, managerName?: string): Promise<ParsedBazaarResult> {
+  async parse(
+    rawText: string,
+    messId?: string,
+    managerName?: string,
+  ): Promise<ParsedBazaarResult> {
     // ১. রেডিস / ডিবি থেকে ডায়নামিক শেখা শব্দগুলো আনা
     const dynamicItems = await this.patternMemory.getLearnedItems(messId);
 
@@ -35,7 +39,7 @@ export class SmartBazaarParserService implements IBazaarParser {
     if (
       (tier1Result.items.length > 0 || tier1Result.depositAmount > 0) &&
       unparsedWarnings.length === 0 &&
-      tier1Result.confidence >= 0.90
+      tier1Result.confidence >= 0.9
     ) {
       this.logger.log(
         `[SmartParser] Tier 1 Local Success (Confidence: ${Math.round(tier1Result.confidence * 100)}%, Items: ${tier1Result.items.length}) - 0 AI Cost`,
@@ -69,7 +73,10 @@ export class SmartBazaarParserService implements IBazaarParser {
         w.startsWith('⚠️ Price Warning:'),
       );
       if (priceWarnings.length > 0) {
-        tier2Result.warnings = [...(tier2Result.warnings || []), ...priceWarnings];
+        tier2Result.warnings = [
+          ...(tier2Result.warnings || []),
+          ...priceWarnings,
+        ];
       }
 
       return tier2Result;

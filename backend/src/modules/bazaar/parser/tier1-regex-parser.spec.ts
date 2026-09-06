@@ -61,7 +61,9 @@ describe('Tier1RegexParser (Unit Tests)', () => {
     });
 
     it('should handle multi-line deposit and separate return line', async () => {
-      const res = await parser.parse('deposit 2000\nferot nisi 300\nalu 2kg 80');
+      const res = await parser.parse(
+        'deposit 2000\nferot nisi 300\nalu 2kg 80',
+      );
       expect(res.depositAmount).toBe(1700);
       expect(res.items.length).toBe(1);
     });

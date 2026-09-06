@@ -49,7 +49,9 @@ export class BazaarService {
     const cleanName = name.toLowerCase().trim();
 
     // 1. Exact match
-    const exact = members.find((m) => m.name.toLowerCase().trim() === cleanName);
+    const exact = members.find(
+      (m) => m.name.toLowerCase().trim() === cleanName,
+    );
     if (exact) return exact;
 
     // 2. Substring match
@@ -108,13 +110,23 @@ export class BazaarService {
       }
     }
 
-    const result = await this.smartParser.parse(dto.rawText, messId, managerName);
+    const result = await this.smartParser.parse(
+      dto.rawText,
+      messId,
+      managerName,
+    );
 
     // If AI found memberDeposits, resolve userId (including shopper and mess members)
     if (result.memberDeposits && result.memberDeposits.length > 0) {
       result.memberDeposits = result.memberDeposits.map((md) => {
         const clean = md.memberName.toLowerCase().trim();
-        const isShopper = ['ami', 'shopper', 'me', 'nijer', 'ami (shopper)'].some((k) => clean.includes(k));
+        const isShopper = [
+          'ami',
+          'shopper',
+          'me',
+          'nijer',
+          'ami (shopper)',
+        ].some((k) => clean.includes(k));
         if (isShopper && userId) {
           return {
             ...md,
@@ -145,9 +157,14 @@ export class BazaarService {
     const isManager = user.role === Role.MANAGER;
     const isAutoApproved = isManager;
 
-    const hasMemberDeposits = !!(dto.memberDeposits && dto.memberDeposits.length > 0);
+    const hasMemberDeposits = !!(
+      dto.memberDeposits && dto.memberDeposits.length > 0
+    );
     const totalMemberDeposits = hasMemberDeposits
-      ? dto.memberDeposits!.reduce((sum: number, d: any) => sum + (d.amount || 0), 0)
+      ? dto.memberDeposits!.reduce(
+          (sum: number, d: any) => sum + (d.amount || 0),
+          0,
+        )
       : 0;
 
     if (
@@ -159,7 +176,10 @@ export class BazaarService {
         'Please provide at least one bazaar item or deposit amount',
       );
     }
-    const totalCost = (dto.items || []).reduce((sum, item) => sum + item.cost, 0);
+    const totalCost = (dto.items || []).reduce(
+      (sum, item) => sum + item.cost,
+      0,
+    );
     const summaryString = dto.items
       .map((i) => `${i.name} (${i.quantity} ${i.unit}) - ${i.cost}tk`)
       .join(', ');
@@ -177,7 +197,9 @@ export class BazaarService {
           shopperName: user.name,
           rawText: dto.rawText,
           itemsDetail: dto.items as any,
-          depositAmount: hasMemberDeposits ? totalMemberDeposits : (dto.depositAmount || 0),
+          depositAmount: hasMemberDeposits
+            ? totalMemberDeposits
+            : dto.depositAmount || 0,
         },
       });
 
@@ -194,7 +216,13 @@ export class BazaarService {
           if (!md.amount || md.amount === 0) continue;
           let targetUserId: string = md.userId || '';
           const clean = md.memberName.toLowerCase().trim();
-          const isShopper = ['ami', 'shopper', 'me', 'nijer', 'ami (shopper)'].some((k) => clean.includes(k));
+          const isShopper = [
+            'ami',
+            'shopper',
+            'me',
+            'nijer',
+            'ami (shopper)',
+          ].some((k) => clean.includes(k));
 
           if (!targetUserId) {
             if (isShopper) {
@@ -296,7 +324,8 @@ export class BazaarService {
         if (
           item.originalName &&
           item.name &&
-          item.originalName.toLowerCase().trim() !== item.name.toLowerCase().trim()
+          item.originalName.toLowerCase().trim() !==
+            item.name.toLowerCase().trim()
         ) {
           // ইউজার নিজেই নাম সংশোধন করেছে, তাই কনফিডেন্স ১.০ দিয়ে মুখস্থ করবে
           await this.patternMemory.learnPattern(
@@ -333,7 +362,9 @@ export class BazaarService {
 
     if (!item) throw new NotFoundException('Bazaar item not found');
     if (item.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException(`Item is not pending approval (Current status: ${item.status})`);
+      throw new BadRequestException(
+        `Item is not pending approval (Current status: ${item.status})`,
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -393,7 +424,9 @@ export class BazaarService {
 
     if (!item) throw new NotFoundException('Bazaar item not found');
     if (item.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException(`Item is not pending approval (Current status: ${item.status})`);
+      throw new BadRequestException(
+        `Item is not pending approval (Current status: ${item.status})`,
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {

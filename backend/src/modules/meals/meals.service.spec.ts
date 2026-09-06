@@ -52,7 +52,14 @@ describe('MealsService (Unit Tests)', () => {
         { provide: ContextValidatorService, useValue: mockContextValidator },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: getQueueToken('notification-queue'), useValue: mockQueue },
-        { provide: AppCacheService, useValue: { remember: jest.fn((k, ttl, fn) => fn()), del: jest.fn(), delMany: jest.fn() } },
+        {
+          provide: AppCacheService,
+          useValue: {
+            remember: jest.fn((k, ttl, fn) => fn()),
+            del: jest.fn(),
+            delMany: jest.fn(),
+          },
+        },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();

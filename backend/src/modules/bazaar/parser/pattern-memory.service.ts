@@ -19,23 +19,27 @@ export class PatternMemoryService {
   async getLearnedItems(messId?: string): Promise<ItemDefinition[]> {
     const cacheKey = `bazaar:patterns:${messId || 'global'}`;
 
-    return this.appCache.remember<ItemDefinition[]>(cacheKey, 86400, async () => {
-      const whereClause = messId
-        ? { OR: [{ messId }, { messId: null }] }
-        : { messId: null };
+    return this.appCache.remember<ItemDefinition[]>(
+      cacheKey,
+      86400,
+      async () => {
+        const whereClause = messId
+          ? { OR: [{ messId }, { messId: null }] }
+          : { messId: null };
 
-      const patterns = await this.prisma.learnedBazaarPattern.findMany({
-        where: whereClause,
-        orderBy: { hitCount: 'desc' },
-        take: 200, // সর্বাধিক ব্যবহৃত শীর্ষ ২০০টি শেখা প্যাটার্ন
-      });
+        const patterns = await this.prisma.learnedBazaarPattern.findMany({
+          where: whereClause,
+          orderBy: { hitCount: 'desc' },
+          take: 200, // সর্বাধিক ব্যবহৃত শীর্ষ ২০০টি শেখা প্যাটার্ন
+        });
 
-      return patterns.map((p) => ({
-        canonicalName: p.canonicalName,
-        defaultUnit: p.defaultUnit,
-        aliases: [p.rawPhrase.toLowerCase().trim()],
-      }));
-    });
+        return patterns.map((p) => ({
+          canonicalName: p.canonicalName,
+          defaultUnit: p.defaultUnit,
+          aliases: [p.rawPhrase.toLowerCase().trim()],
+        }));
+      },
+    );
   }
 
   /**
@@ -69,7 +73,8 @@ export class PatternMemoryService {
             canonicalName,
             defaultUnit,
             learnedFrom: source,
-            confidence: source === 'USER_MANUAL_CORRECTION' ? 1.0 : existing.confidence,
+            confidence:
+              source === 'USER_MANUAL_CORRECTION' ? 1.0 : existing.confidence,
           },
         });
       } else {
@@ -95,7 +100,9 @@ export class PatternMemoryService {
         `Learned pattern "${cleanPhrase}" -> "${canonicalName}" (${source}) for mess: ${messId || 'GLOBAL'}`,
       );
     } catch (err: any) {
-      this.logger.warn(`Failed to save learned pattern [${cleanPhrase}]: ${err.message}`);
+      this.logger.warn(
+        `Failed to save learned pattern [${cleanPhrase}]: ${err.message}`,
+      );
     }
   }
 }

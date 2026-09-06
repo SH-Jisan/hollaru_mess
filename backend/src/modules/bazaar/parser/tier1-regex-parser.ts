@@ -1,5 +1,9 @@
 import { FuzzyNormalizer, ItemDefinition } from './fuzzy-normalizer';
-import { IBazaarParser, ParsedBazaarItem, ParsedBazaarResult } from './parser.interface';
+import {
+  IBazaarParser,
+  ParsedBazaarItem,
+  ParsedBazaarResult,
+} from './parser.interface';
 
 export class Tier1RegexParser implements IBazaarParser {
   /**
@@ -43,7 +47,12 @@ export class Tier1RegexParser implements IBazaarParser {
     }
 
     // কালচারাল পরিমাপ রূপান্তর
-    if (unit === 'poa' || unit === 'পোয়া' || unit === 'পোয়া' || unit === 'powa') {
+    if (
+      unit === 'poa' ||
+      unit === 'পোয়া' ||
+      unit === 'পোয়া' ||
+      unit === 'powa'
+    ) {
       quantity = Number((quantity * 0.25).toFixed(3));
       unit = 'kg';
     } else if (unit === 'hali' || unit === 'হালি') {
@@ -61,7 +70,11 @@ export class Tier1RegexParser implements IBazaarParser {
       unit = 'gm';
     } else if (['লিটার', 'লি', 'ltr', 'liter', 'litre'].includes(unit)) {
       unit = 'ltr';
-    } else if (['পিস', 'পিচ', 'টি', 'টা', 'pc', 'pcs', 'piece', 'ta', 'ti'].includes(unit)) {
+    } else if (
+      ['পিস', 'পিচ', 'টি', 'টা', 'pc', 'pcs', 'piece', 'ta', 'ti'].includes(
+        unit,
+      )
+    ) {
       unit = 'piece';
     }
 
@@ -75,14 +88,16 @@ export class Tier1RegexParser implements IBazaarParser {
     rawText: string,
     dynamicItems: ItemDefinition[] = [],
   ): Promise<ParsedBazaarResult> {
-    const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0);
+    const lines = rawText
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
 
     let depositAmount = 0;
     const items: ParsedBazaarItem[] = [];
     const warnings: string[] = [];
 
-
-        // ১. কম্বাইন্ড ডিপোজিট ও ফেরত রিজেক্স (যেমন: "taka disi 3000 ferot nisi 500", "manager dilo 2000 ferot 300")
+    // ১. কম্বাইন্ড ডিপোজিট ও ফেরত রিজেক্স (যেমন: "taka disi 3000 ferot nisi 500", "manager dilo 2000 ferot 300")
     const combinedDepositReturnRegex =
       /(?:(?:ami\s+)?(?:taka\s+disi|taka\s+joma|deposit|joma|টাকা\s*জমা|টাকা|manager\s+(?:dilo|dise)|paisi)\s*[:=-]?\s*(\d+(?:,\d+)*(?:\.\d+)?k?)\s*(?:tk|taka|টাকা|\/-)?)\s*(?:,|\band\b|\bএবং\b|\s+|-)?\s*(?:(?:(?:ferot|pherot|ফেরত|baki|বাকি)\s*(?:nisi|nilam|nilo|dilam|disi|paisi)?|(?:nisi|nilam|nilo|dilam)\s*(?:ferot|pherot|ফেরত)?)\s*[:=-]?\s*(\d+(?:,\d+)*(?:\.\d+)?k?)\s*(?:tk|taka|টাকা|\/-)?)/i;
 
@@ -95,7 +110,8 @@ export class Tier1RegexParser implements IBazaarParser {
       /^(?:ami\s+)?(?:taka\s+disi|taka\s+joma|deposit|joma|টাকা\s*জমা|manager\s+(?:dilo|dise)|paisi|টাকা|টাকা\s+দিসি)\s*[:=-]?\s*(\d+(?:,\d+)*(?:\.\d+)?k?)\s*(?:tk|taka|টাকা|\/-)?$/i;
 
     // ৪. ফুল বাজার আইটেম রিজেক্স (নাম + পরিমাণ + একক + দাম)
-    const unitPattern = '(?:kg|gm|gram|ltr|liter|litre|piece|pcs|pc|ta|ti|hali|poa|powa|dozen|dozon|kuri|কেজি|গ্রাম|লিটার|পিচ|পিস|টি|টা|পোয়া|পোয়া|হালি|ডজন|কুড়ি|কুড়ি)';
+    const unitPattern =
+      '(?:kg|gm|gram|ltr|liter|litre|piece|pcs|pc|ta|ti|hali|poa|powa|dozen|dozon|kuri|কেজি|গ্রাম|লিটার|পিচ|পিস|টি|টা|পোয়া|পোয়া|হালি|ডজন|কুড়ি|কুড়ি)';
     const fullItemRegex = new RegExp(
       `^([a-zA-Z\\u0980-\\u09FF\\s]+?)\\s+(\\d+(?:\\.\\d+)?)\\s*(${unitPattern})?\\s+(\\d+(?:,\\d+)*(?:\\.\\d+)?k?)\\s*(?:tk|taka|টাকা|\\/-)?$`,
       'i',
@@ -111,8 +127,12 @@ export class Tier1RegexParser implements IBazaarParser {
       // ক. কম্বাইন্ড ডিপোজিট ও রিফান্ড চেক (Net Deposit: Given - Return)
       const combinedMatch = normalizedLine.match(combinedDepositReturnRegex);
       if (combinedMatch) {
-        const given = Tier1RegexParser.parseNumberWithMultiplier(combinedMatch[1]);
-        const returned = Tier1RegexParser.parseNumberWithMultiplier(combinedMatch[2]);
+        const given = Tier1RegexParser.parseNumberWithMultiplier(
+          combinedMatch[1],
+        );
+        const returned = Tier1RegexParser.parseNumberWithMultiplier(
+          combinedMatch[2],
+        );
         depositAmount += Math.max(0, given - returned);
         continue;
       }
@@ -120,7 +140,9 @@ export class Tier1RegexParser implements IBazaarParser {
       // খ. স্ট্যান্ডঅ্যালোন রিফান্ড চেক (মাইনাস করা)
       const returnMatch = normalizedLine.match(standaloneReturnRegex);
       if (returnMatch) {
-        const returned = Tier1RegexParser.parseNumberWithMultiplier(returnMatch[1]);
+        const returned = Tier1RegexParser.parseNumberWithMultiplier(
+          returnMatch[1],
+        );
         depositAmount = Math.max(0, depositAmount - returned);
         continue;
       }
@@ -128,7 +150,9 @@ export class Tier1RegexParser implements IBazaarParser {
       // গ. সাধারণ ডিপোজিট চেক
       const depositMatch = normalizedLine.match(depositRegex);
       if (depositMatch) {
-        depositAmount += Tier1RegexParser.parseNumberWithMultiplier(depositMatch[1]);
+        depositAmount += Tier1RegexParser.parseNumberWithMultiplier(
+          depositMatch[1],
+        );
         continue;
       }
 
@@ -192,9 +216,15 @@ export class Tier1RegexParser implements IBazaarParser {
           isAnomaly = true;
         } else if (lowerName.includes('dim') && unitPrice > 50) {
           isAnomaly = true;
-        } else if ((lowerName.includes('murgi') || lowerName.includes('chicken')) && unitPrice > 800) {
+        } else if (
+          (lowerName.includes('murgi') || lowerName.includes('chicken')) &&
+          unitPrice > 800
+        ) {
           isAnomaly = true;
-        } else if ((lowerName.includes('goru') || lowerName.includes('beef')) && unitPrice > 2000) {
+        } else if (
+          (lowerName.includes('goru') || lowerName.includes('beef')) &&
+          unitPrice > 2000
+        ) {
           isAnomaly = true;
         } else if (lowerName.includes('dal') && unitPrice > 400) {
           isAnomaly = true;
@@ -202,7 +232,11 @@ export class Tier1RegexParser implements IBazaarParser {
           isAnomaly = true;
         } else if (lowerName.includes('chaul') && unitPrice > 250) {
           isAnomaly = true;
-        } else if (unitPrice > 1500 && item.cost >= 1000 && item.cost % 100 === 0) {
+        } else if (
+          unitPrice > 1500 &&
+          item.cost >= 1000 &&
+          item.cost % 100 === 0
+        ) {
           isAnomaly = true;
         }
 
@@ -218,12 +252,18 @@ export class Tier1RegexParser implements IBazaarParser {
     const totalCost = items.reduce((sum, item) => sum + item.cost, 0);
 
     // কনফিডেন্স স্কোর হিসাব (কড়া ৯০% বাউন্ডারি)
-    const unparsedCount = warnings.filter((w) => w.startsWith('Could not parse line:')).length;
+    const unparsedCount = warnings.filter((w) =>
+      w.startsWith('Could not parse line:'),
+    ).length;
     let overallConfidence = 0.0;
 
     if (items.length > 0) {
-      const avgItemConfidence = items.reduce((sum, i) => sum + i.confidence, 0) / items.length;
-      overallConfidence = Math.max(0.1, Number((avgItemConfidence - unparsedCount * 0.3).toFixed(2)));
+      const avgItemConfidence =
+        items.reduce((sum, i) => sum + i.confidence, 0) / items.length;
+      overallConfidence = Math.max(
+        0.1,
+        Number((avgItemConfidence - unparsedCount * 0.3).toFixed(2)),
+      );
     } else if (depositAmount > 0 && unparsedCount === 0) {
       overallConfidence = 1.0;
     }

@@ -32,26 +32,27 @@ import { RejectBazaarDto } from './dto/reject-bazaar.dto';
 @Controller('bazaar')
 export class BazaarController {
   constructor(private readonly bazaarService: BazaarService) {}
-  
+
   // -------------------------------------------------------------
   // ১. SMART NOTEPAD PREVIEW
   // -------------------------------------------------------------
   @Post('smart-parse')
-  @ApiOperation({ summary: 'Preview notepad parsing (Dual Engine: Regex + AI)' })
+  @ApiOperation({
+    summary: 'Preview notepad parsing (Dual Engine: Regex + AI)',
+  })
   @ApiResponse({ status: 200, description: 'Parsed structure returned.' })
-  smartParse(
-    @Body() dto: SmartParseDto,
-    @CurrentUser() user: { id: string },
-  ) {
+  smartParse(@Body() dto: SmartParseDto, @CurrentUser() user: { id: string }) {
     return this.bazaarService.smartParse(dto, user?.id);
   }
-
 
   // -------------------------------------------------------------
   // ২. SMART NOTEPAD SUBMIT
   // -------------------------------------------------------------
   @Post('smart-submit')
-  @ApiOperation({ summary: 'Submit parsed notepad items and deposit (Member: Pending Approval, Manager: Auto-Approved)' })
+  @ApiOperation({
+    summary:
+      'Submit parsed notepad items and deposit (Member: Pending Approval, Manager: Auto-Approved)',
+  })
   @ApiResponse({ status: 201, description: 'Bazaar submitted successfully.' })
   smartSubmit(
     @Body() dto: SmartSubmitDto,
@@ -66,8 +67,13 @@ export class BazaarController {
   @Patch('approve/:id')
   @UseGuards(RolesGuard)
   @Roles(Role.MANAGER)
-  @ApiOperation({ summary: 'Approve pending bazaar item & deposit (Manager only)' })
-  @ApiResponse({ status: 200, description: 'Bazaar item approved and added to billing.' })
+  @ApiOperation({
+    summary: 'Approve pending bazaar item & deposit (Manager only)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bazaar item approved and added to billing.',
+  })
   approveBazaar(
     @Param('id') itemId: string,
     @CurrentUser() user: { id: string },
@@ -81,7 +87,9 @@ export class BazaarController {
   @Patch('reject/:id')
   @UseGuards(RolesGuard)
   @Roles(Role.MANAGER)
-  @ApiOperation({ summary: 'Reject pending bazaar item & deposit (Manager only)' })
+  @ApiOperation({
+    summary: 'Reject pending bazaar item & deposit (Manager only)',
+  })
   @ApiResponse({ status: 200, description: 'Bazaar item rejected.' })
   rejectBazaar(
     @Param('id') itemId: string,

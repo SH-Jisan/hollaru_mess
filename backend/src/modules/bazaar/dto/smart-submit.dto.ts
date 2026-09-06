@@ -1,4 +1,11 @@
-import { IsArray, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -43,7 +50,9 @@ export class MemberDepositDto {
 }
 
 export class SmartSubmitDto {
-  @ApiProperty({ example: 'ami taka disi 2000\nalu 2kg 200\ndal 1kg 100\nchaul 10kg 5k' })
+  @ApiProperty({
+    example: 'ami taka disi 2000\nalu 2kg 200\ndal 1kg 100\nchaul 10kg 5k',
+  })
   @IsString()
   @IsNotEmpty()
   rawText: string;

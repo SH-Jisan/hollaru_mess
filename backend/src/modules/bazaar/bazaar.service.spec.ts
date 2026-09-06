@@ -45,10 +45,16 @@ describe('BazaarService (Unit Tests)', () => {
       update: jest.fn().mockResolvedValue({}),
     },
     mess: {
-      findUnique: jest.fn().mockResolvedValue({ id: 'mess_1', managerId: 'manager_1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ id: 'mess_1', managerId: 'manager_1' }),
     },
     user: {
-      findUnique: jest.fn().mockResolvedValue({ id: 'manager_1', name: 'Manager', messId: 'mess_1' }),
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'manager_1',
+        name: 'Manager',
+        messId: 'mess_1',
+      }),
       findMany: jest.fn().mockResolvedValue([
         { id: 'user_rohim', name: 'Rohim' },
         { id: 'user_korim', name: 'Korim' },
@@ -89,7 +95,16 @@ describe('BazaarService (Unit Tests)', () => {
   const mockSmartParser = {
     parse: jest.fn().mockResolvedValue({
       depositAmount: 2000,
-      items: [{ name: 'Alu (আলু)', originalName: 'alu', quantity: 2, unit: 'kg', cost: 200, confidence: 1 }],
+      items: [
+        {
+          name: 'Alu (আলু)',
+          originalName: 'alu',
+          quantity: 2,
+          unit: 'kg',
+          cost: 200,
+          confidence: 1,
+        },
+      ],
       totalCost: 200,
       rawText: 'alu 2kg 200',
       engineUsed: 'TIER1_REGEX',
@@ -108,7 +123,11 @@ describe('BazaarService (Unit Tests)', () => {
         { provide: getQueueToken('notification-queue'), useValue: mockQueue },
         {
           provide: AppCacheService,
-          useValue: { remember: jest.fn((k, ttl, fn) => fn()), del: jest.fn(), delMany: jest.fn() },
+          useValue: {
+            remember: jest.fn((k, ttl, fn) => fn()),
+            del: jest.fn(),
+            delMany: jest.fn(),
+          },
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         { provide: SmartBazaarParserService, useValue: mockSmartParser },
@@ -123,7 +142,11 @@ describe('BazaarService (Unit Tests)', () => {
     it('should preview parse results from smartParser engine', async () => {
       const res = await service.smartParse({ rawText: 'alu 2kg 200' });
       expect(res.totalCost).toBe(200);
-      expect(mockSmartParser.parse).toHaveBeenCalledWith('alu 2kg 200', undefined, undefined);
+      expect(mockSmartParser.parse).toHaveBeenCalledWith(
+        'alu 2kg 200',
+        undefined,
+        undefined,
+      );
     });
 
     it('should resolve member userIds when memberDeposits are parsed and userId is passed', async () => {
@@ -141,7 +164,10 @@ describe('BazaarService (Unit Tests)', () => {
         warnings: [],
       });
 
-      const res = await service.smartParse({ rawText: 'korim 500 jisun 1.5k' }, 'user_rafi');
+      const res = await service.smartParse(
+        { rawText: 'korim 500 jisun 1.5k' },
+        'user_rafi',
+      );
       expect(res.memberDeposits).toBeDefined();
       expect(res.memberDeposits![0].userId).toBe('user_korim');
       expect(res.memberDeposits![1].userId).toBe('user_jisan'); // fuzzy matched!
@@ -168,7 +194,10 @@ describe('BazaarService (Unit Tests)', () => {
           status: 'PENDING_APPROVAL',
         }),
       });
-      expect(mockQueue.add).toHaveBeenCalledWith('send-user-notification', expect.any(Object));
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'send-user-notification',
+        expect.any(Object),
+      );
     });
   });
 
@@ -176,7 +205,8 @@ describe('BazaarService (Unit Tests)', () => {
     it('should create individual deposits for each contributor and match members accurately', async () => {
       const res = await service.smartSubmit(
         {
-          rawText: 'korim dise 500\nrohim dse 500\njisun dis 1.5k\nchal 5kg 300',
+          rawText:
+            'korim dise 500\nrohim dse 500\njisun dis 1.5k\nchal 5kg 300',
           items: [{ name: 'Chal', quantity: 5, unit: 'kg', cost: 300 }],
           memberDeposits: [
             { memberName: 'korim', amount: 500 },
@@ -228,9 +258,7 @@ describe('BazaarService (Unit Tests)', () => {
         {
           rawText: 'unknownPerson 500',
           items: [{ name: 'Chal', quantity: 5, unit: 'kg', cost: 300 }],
-          memberDeposits: [
-            { memberName: 'unknownPerson', amount: 500 },
-          ],
+          memberDeposits: [{ memberName: 'unknownPerson', amount: 500 }],
         },
         'user_rafi',
       );
@@ -247,7 +275,8 @@ describe('BazaarService (Unit Tests)', () => {
     it('should support negative deposits for shopper when unreturned change is kept', async () => {
       const res = await service.smartSubmit(
         {
-          rawText: 'korim 500\nrohim 500\njisun 1.5k\nchal 300\nmurgi 1k\nmas 200\nrohim ke ferot 900',
+          rawText:
+            'korim 500\nrohim 500\njisun 1.5k\nchal 300\nmurgi 1k\nmas 200\nrohim ke ferot 900',
           items: [
             { name: 'Chal', quantity: 5, unit: 'kg', cost: 300 },
             { name: 'Murgi', quantity: 5, unit: 'kg', cost: 1000 },
@@ -299,10 +328,7 @@ describe('BazaarService (Unit Tests)', () => {
       expect(res.status).toBe('COMPLETED');
       expect(mockPrismaService.deposit.updateMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { bazaarItemId: 'item_1' },
-            { id: 'dep_1' },
-          ],
+          OR: [{ bazaarItemId: 'item_1' }, { id: 'dep_1' }],
         },
         data: { status: 'APPROVED' },
       });
@@ -324,15 +350,16 @@ describe('BazaarService (Unit Tests)', () => {
         depositId: 'dep_1',
       });
 
-      const res = await service.rejectBazaar('item_1', { reason: 'Incorrect items' }, 'manager_1');
+      const res = await service.rejectBazaar(
+        'item_1',
+        { reason: 'Incorrect items' },
+        'manager_1',
+      );
 
       expect(res.status).toBe('REJECTED');
       expect(mockPrismaService.deposit.updateMany).toHaveBeenCalledWith({
         where: {
-          OR: [
-            { bazaarItemId: 'item_1' },
-            { id: 'dep_1' },
-          ],
+          OR: [{ bazaarItemId: 'item_1' }, { id: 'dep_1' }],
         },
         data: { status: 'REJECTED' },
       });
