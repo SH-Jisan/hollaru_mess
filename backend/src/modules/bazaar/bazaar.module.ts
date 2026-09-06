@@ -3,6 +3,7 @@ import { BazaarController } from './bazaar.controller';
 import { BazaarService } from './bazaar.service';
 import { Tier2AiParserService } from './parser/tier2-ai-parser.service';
 import { SmartBazaarParserService } from './parser/smart-bazaar-parser.service';
+import { PatternMemoryService } from './parser/pattern-memory.service';
 
 @Module({
   controllers: [BazaarController],
@@ -10,8 +11,9 @@ import { SmartBazaarParserService } from './parser/smart-bazaar-parser.service';
     BazaarService,
     Tier2AiParserService,
     SmartBazaarParserService,
+    PatternMemoryService,
   ],
 
-  exports: [BazaarService, SmartBazaarParserService],
+  exports: [BazaarService, SmartBazaarParserService, PatternMemoryService],
 })
 export class BazaarModule {}

@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -15,6 +17,8 @@ import { SmartParseDto } from './dto/smart-parse.dto';
 import { SmartSubmitDto } from './dto/smart-submit.dto';
 import { RejectBazaarDto } from './dto/reject-bazaar.dto';
 import { SmartBazaarParserService } from './parser/smart-bazaar-parser.service';
+import { FuzzyNormalizer } from './parser/fuzzy-normalizer';
+import { PatternMemoryService } from './parser/pattern-memory.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppCacheService } from '../../common/cache/app-cache.service';
 import { CacheKeys } from '../../common/cache/cache-keys';
@@ -22,6 +26,8 @@ import { CacheEvents } from '../../common/cache/cache-events.enum';
 
 @Injectable()
 export class BazaarService {
+  private readonly logger = new Logger(BazaarService.name);
+
   constructor(
     private prisma: PrismaService,
     private validator: ContextValidatorService,
@@ -29,13 +35,104 @@ export class BazaarService {
     private eventEmitter: EventEmitter2,
     @InjectQueue('notification-queue') private notificationQueue: Queue,
     private smartParser: SmartBazaarParserService,
+    @Optional() private patternMemory?: PatternMemoryService,
   ) {}
 
   // -------------------------------------------------------------
   // ১. SMART NOTEPAD PARSE (PREVIEW ONLY)
   // -------------------------------------------------------------
-  async smartParse(dto: SmartParseDto) {
-    return this.smartParser.parse(dto.rawText);
+  private resolveMember(
+    name: string,
+    members: { id: string; name: string }[],
+  ): { id: string; name: string } | null {
+    if (!name || members.length === 0) return null;
+    const cleanName = name.toLowerCase().trim();
+
+    // 1. Exact match
+    const exact = members.find((m) => m.name.toLowerCase().trim() === cleanName);
+    if (exact) return exact;
+
+    // 2. Substring match
+    const substringMatch = members.find(
+      (m) =>
+        m.name.toLowerCase().includes(cleanName) ||
+        cleanName.includes(m.name.toLowerCase()),
+    );
+    if (substringMatch) return substringMatch;
+
+    // 3. Fuzzy Levenshtein Distance (allowing up to 2 typos)
+    let bestMatch: { id: string; name: string } | null = null;
+    let minDistance = 3;
+
+    for (const m of members) {
+      const dist = FuzzyNormalizer.levenshteinDistance(
+        cleanName,
+        m.name.toLowerCase().trim(),
+      );
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestMatch = m;
+      }
+    }
+
+    return bestMatch;
+  }
+
+  async smartParse(dto: SmartParseDto, userId?: string) {
+    let messId: string | undefined;
+    let managerName: string | undefined;
+    let messMembers: { id: string; name: string }[] = [];
+
+    if (userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { messId: true },
+      });
+      messId = user?.messId || undefined;
+      if (messId) {
+        const mess = await this.prisma.mess.findUnique({
+          where: { id: messId },
+          select: { managerId: true },
+        });
+        if (mess?.managerId) {
+          const manager = await this.prisma.user.findUnique({
+            where: { id: mess.managerId },
+            select: { name: true },
+          });
+          managerName = manager?.name;
+        }
+        messMembers = await this.prisma.user.findMany({
+          where: { messId },
+          select: { id: true, name: true },
+        });
+      }
+    }
+
+    const result = await this.smartParser.parse(dto.rawText, messId, managerName);
+
+    // If AI found memberDeposits, resolve userId (including shopper and mess members)
+    if (result.memberDeposits && result.memberDeposits.length > 0) {
+      result.memberDeposits = result.memberDeposits.map((md) => {
+        const clean = md.memberName.toLowerCase().trim();
+        const isShopper = ['ami', 'shopper', 'me', 'nijer', 'ami (shopper)'].some((k) => clean.includes(k));
+        if (isShopper && userId) {
+          return {
+            ...md,
+            userId: userId,
+          };
+        }
+        if (messMembers.length > 0) {
+          const matched = this.resolveMember(md.memberName, messMembers);
+          return {
+            ...md,
+            userId: matched?.id,
+          };
+        }
+        return md;
+      });
+    }
+
+    return result;
   }
 
   // -------------------------------------------------------------
@@ -48,8 +145,19 @@ export class BazaarService {
     const isManager = user.role === Role.MANAGER;
     const isAutoApproved = isManager;
 
-    if ((!dto.items || dto.items.length === 0) && (!dto.depositAmount || dto.depositAmount <= 0)) {
-      throw new BadRequestException("Please provide at least one bazaar item or deposit amount");
+    const hasMemberDeposits = !!(dto.memberDeposits && dto.memberDeposits.length > 0);
+    const totalMemberDeposits = hasMemberDeposits
+      ? dto.memberDeposits!.reduce((sum: number, d: any) => sum + (d.amount || 0), 0)
+      : 0;
+
+    if (
+      (!dto.items || dto.items.length === 0) &&
+      (!dto.depositAmount || dto.depositAmount === 0) &&
+      !hasMemberDeposits
+    ) {
+      throw new BadRequestException(
+        'Please provide at least one bazaar item or deposit amount',
+      );
     }
     const totalCost = (dto.items || []).reduce((sum, item) => sum + item.cost, 0);
     const summaryString = dto.items
@@ -69,14 +177,54 @@ export class BazaarService {
           shopperName: user.name,
           rawText: dto.rawText,
           itemsDetail: dto.items as any,
-          depositAmount: dto.depositAmount || 0,
+          depositAmount: hasMemberDeposits ? totalMemberDeposits : (dto.depositAmount || 0),
         },
       });
 
-      // ২. যদি ডিপোজিট ডিটেক্ট হয়ে থাকে (যেমন: ami taka disi 2000)
-      let createdDeposit: any = null;
-      if (dto.depositAmount && dto.depositAmount > 0) {
-        createdDeposit = await tx.deposit.create({
+      // ২. মাল্টি-মেম্বার অথবা সিঙ্গেল ডিপোজিট তৈরি
+      const createdDeposits: any[] = [];
+
+      if (hasMemberDeposits) {
+        const messMembers = await tx.user.findMany({
+          where: { messId: mess.id },
+          select: { id: true, name: true },
+        });
+
+        for (const md of dto.memberDeposits!) {
+          if (!md.amount || md.amount === 0) continue;
+          let targetUserId: string = md.userId || '';
+          const clean = md.memberName.toLowerCase().trim();
+          const isShopper = ['ami', 'shopper', 'me', 'nijer', 'ami (shopper)'].some((k) => clean.includes(k));
+
+          if (!targetUserId) {
+            if (isShopper) {
+              targetUserId = userId;
+            } else {
+              const matched = this.resolveMember(md.memberName, messMembers);
+              targetUserId = matched ? matched.id : userId;
+            }
+          }
+
+          const dep = await tx.deposit.create({
+            data: {
+              monthId: activeMonthId,
+              userId: targetUserId,
+              amount: md.amount,
+              status: isAutoApproved ? 'APPROVED' : 'PENDING_APPROVAL',
+              bazaarItemId: item.id,
+            },
+          });
+          createdDeposits.push(dep);
+        }
+
+        if (createdDeposits.length > 0) {
+          await tx.bazaarItem.update({
+            where: { id: item.id },
+            data: { depositId: createdDeposits[0].id },
+          });
+        }
+      } else if (dto.depositAmount && dto.depositAmount > 0) {
+        const singleDeposit = await tx.deposit.create({
           data: {
             monthId: activeMonthId,
             userId: userId,
@@ -85,16 +233,31 @@ export class BazaarService {
             bazaarItemId: item.id,
           },
         });
+        createdDeposits.push(singleDeposit);
 
         // BazaarItem এ ডিপোজিট রেফারেন্স লিংক করা
         await tx.bazaarItem.update({
           where: { id: item.id },
-          data: { depositId: createdDeposit.id },
+          data: { depositId: singleDeposit.id },
         });
       }
 
-      return { item, deposit: createdDeposit };
+      // ৩. যদি ম্যানেজার নিজেই সাবমিট করে থাকেন তবে ইনস্ট্যান্ট মান্থলি কস্ট বৃদ্ধি
+      if (isAutoApproved) {
+        await tx.monthlyData.update({
+          where: { id: activeMonthId },
+          data: { totalBazaarCost: { increment: totalCost } },
+        });
+      }
+
+      return { item, createdDeposits };
     });
+
+    const depositDesc = hasMemberDeposits
+      ? ` with ${result.createdDeposits.length} member deposits (BDT ${totalMemberDeposits})`
+      : dto.depositAmount
+        ? ` with BDT ${dto.depositAmount} deposit`
+        : '';
 
     if (isAutoApproved) {
       // ম্যানেজার সাবমিট করায় সাথে সাথে ক্যাশ ইনভ্যালিডেট হবে
@@ -110,7 +273,7 @@ export class BazaarService {
       await this.notificationQueue.add('send-mess-notification', {
         messId: mess.id,
         title: '🛒 Bazaar Added by Manager',
-        body: `Manager logged bazaar of BDT ${totalCost}${dto.depositAmount ? ` with BDT ${dto.depositAmount} deposit` : ''}.`,
+        body: `Manager logged bazaar of BDT ${totalCost}${depositDesc}.`,
       });
     } else {
       // মেম্বার সাবমিট করায় ম্যানেজারকে রিভিউ এর নোটিফিকেশন পাঠানো হবে
@@ -122,8 +285,28 @@ export class BazaarService {
         await this.notificationQueue.add('send-user-notification', {
           userId: manager.id,
           title: '🔔 Bazaar Approval Request',
-          body: `${user.name} submitted a bazaar note (BDT ${totalCost}) awaiting your approval.`,
+          body: `${user.name} submitted a bazaar note (BDT ${totalCost})${depositDesc} awaiting your approval.`,
         });
+      }
+    }
+
+    // 🧠 ৪. Supervised Human Feedback (ইউজার যদি কোনো আইটেমের নাম নিজে এডিট করে থাকে)
+    if (this.patternMemory && dto.items && dto.items.length > 0) {
+      for (const item of dto.items) {
+        if (
+          item.originalName &&
+          item.name &&
+          item.originalName.toLowerCase().trim() !== item.name.toLowerCase().trim()
+        ) {
+          // ইউজার নিজেই নাম সংশোধন করেছে, তাই কনফিডেন্স ১.০ দিয়ে মুখস্থ করবে
+          await this.patternMemory.learnPattern(
+            item.originalName,
+            item.name,
+            item.unit || 'kg',
+            mess.id,
+            'USER_MANUAL_CORRECTION',
+          );
+        }
       }
     }
 
@@ -133,7 +316,8 @@ export class BazaarService {
         : 'Bazaar submitted and pending manager approval',
       isAutoApproved,
       bazaarItem: result.item,
-      deposit: result.deposit,
+      deposit: result.createdDeposits[0] || null,
+      deposits: result.createdDeposits,
     };
   }
 
@@ -160,12 +344,15 @@ export class BazaarService {
       });
 
       // ২. সংশ্লিষ্ট ডিপোজিট থাকলে status -> APPROVED
-      if (approvedItem.depositId) {
-        await tx.deposit.update({
-          where: { id: approvedItem.depositId },
-          data: { status: 'APPROVED' },
-        });
-      }
+      await tx.deposit.updateMany({
+        where: {
+          OR: [
+            { bazaarItemId: itemId },
+            ...(approvedItem.depositId ? [{ id: approvedItem.depositId }] : []),
+          ],
+        },
+        data: { status: 'APPROVED' },
+      });
 
       return approvedItem;
     });
@@ -218,12 +405,15 @@ export class BazaarService {
         },
       });
 
-      if (rejectedItem.depositId) {
-        await tx.deposit.update({
-          where: { id: rejectedItem.depositId },
-          data: { status: 'REJECTED' },
-        });
-      }
+      await tx.deposit.updateMany({
+        where: {
+          OR: [
+            { bazaarItemId: itemId },
+            ...(rejectedItem.depositId ? [{ id: rejectedItem.depositId }] : []),
+          ],
+        },
+        data: { status: 'REJECTED' },
+      });
 
       return rejectedItem;
     });

@@ -54,22 +54,33 @@ export class FuzzyNormalizer {
 
   /**
    * টাইপো সংশোধন ও স্ট্যান্ডার্ড নাম বের করা:
-   * ইনপুট 'allu' দিলে রিটার্ন করবে { canonicalName: 'Alu (আলু)', unit: 'kg', confidence: 0.95 }
+   * ১. প্রথমে dynamicItems (শেখা প্যাটার্ন) চেক করে
+   * ২. তারপর COMMON_MESS_ITEMS চেক করে
    */
-  public static normalize(rawWord: string): { canonicalName: string; defaultUnit: string; confidence: number } {
-    const cleanWord = (rawWord || "").trim().toLowerCase();
+  public static normalize(
+    rawWord: string,
+    dynamicItems: ItemDefinition[] = [],
+  ): { canonicalName: string; defaultUnit: string; confidence: number } {
+    const cleanWord = (rawWord || '').trim().toLowerCase();
     if (!cleanWord) {
-      return { canonicalName: "Unknown", defaultUnit: "item", confidence: 0 };
+      return { canonicalName: 'Unknown', defaultUnit: 'item', confidence: 0 };
     }
+
+    // ডায়নামিক শেখা প্যাটার্নকে অগ্রাধিকার দেওয়া হয়
+    const allItems = [...dynamicItems, ...COMMON_MESS_ITEMS];
 
     let bestMatch: ItemDefinition | null = null;
     let minDistance = Infinity;
 
-    for (const item of COMMON_MESS_ITEMS) {
+    for (const item of allItems) {
       for (const alias of item.aliases) {
         // ১. হুবহু মিলে গেলে (Exact Match) -> 100% Confidence
         if (cleanWord === alias.toLowerCase()) {
-          return { canonicalName: item.canonicalName, defaultUnit: item.defaultUnit, confidence: 1.0 };
+          return {
+            canonicalName: item.canonicalName,
+            defaultUnit: item.defaultUnit,
+            confidence: 1.0,
+          };
         }
 
         // ২. Levenshtein Distance পরিমাপ
@@ -81,7 +92,7 @@ export class FuzzyNormalizer {
       }
     }
 
-    // ৩. যদি পার্থক্য সর্বোচ্চ ১ বা ২ হয় (শব্দের দৈর্ঘ্যের ওপর নির্ভর করে)
+    // ৩. যদি পার্থক্য সর্বোচ্চ ১ বা ২ হয় (শব্দের দৈর্ঘ্যের উপর নির্ভর করে)
     const threshold = cleanWord.length <= 4 ? 1 : 2;
     if (bestMatch && minDistance <= threshold) {
       const confidence = Math.max(0.7, 1 - minDistance * 0.15);
@@ -92,7 +103,7 @@ export class FuzzyNormalizer {
       };
     }
 
-    // ৪. ডিকশনারিতে না পাওয়া নতুন কোনো আইটেম হলে মূল নামটিকে ক্যাপিটালাইজ করে রিটার্ন করবে
+    // ৪. ডিকশনারিতে না পাওয়া নতুন কোনো আইটেম হলে মূল নামটি ক্যাপিটালাইজ করবে
     const capitalized = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
     return {
       canonicalName: capitalized,

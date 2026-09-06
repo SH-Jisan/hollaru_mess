@@ -26,6 +26,22 @@ export class SmartItemDto {
   cost: number;
 }
 
+export class MemberDepositDto {
+  @ApiProperty({ example: 'Korim' })
+  @IsString()
+  @IsNotEmpty()
+  memberName: string;
+
+  @ApiProperty({ example: 500 })
+  @IsNumber()
+  amount: number;
+
+  @ApiProperty({ example: 'user-uuid-123', required: false })
+  @IsString()
+  @IsOptional()
+  userId?: string;
+}
+
 export class SmartSubmitDto {
   @ApiProperty({ example: 'ami taka disi 2000\nalu 2kg 200\ndal 1kg 100\nchaul 10kg 5k' })
   @IsString()
@@ -42,4 +58,11 @@ export class SmartSubmitDto {
   @ValidateNested({ each: true })
   @Type(() => SmartItemDto)
   items: SmartItemDto[];
+
+  @ApiProperty({ type: [MemberDepositDto], required: false })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => MemberDepositDto)
+  memberDeposits?: MemberDepositDto[];
 }

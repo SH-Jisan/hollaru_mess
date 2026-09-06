@@ -32,16 +32,20 @@ import { RejectBazaarDto } from './dto/reject-bazaar.dto';
 @Controller('bazaar')
 export class BazaarController {
   constructor(private readonly bazaarService: BazaarService) {}
-
+  
   // -------------------------------------------------------------
   // ১. SMART NOTEPAD PREVIEW
   // -------------------------------------------------------------
   @Post('smart-parse')
   @ApiOperation({ summary: 'Preview notepad parsing (Dual Engine: Regex + AI)' })
   @ApiResponse({ status: 200, description: 'Parsed structure returned.' })
-  smartParse(@Body() dto: SmartParseDto) {
-    return this.bazaarService.smartParse(dto);
+  smartParse(
+    @Body() dto: SmartParseDto,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.bazaarService.smartParse(dto, user?.id);
   }
+
 
   // -------------------------------------------------------------
   // ২. SMART NOTEPAD SUBMIT

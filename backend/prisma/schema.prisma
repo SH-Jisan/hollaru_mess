@@ -53,9 +53,10 @@ model Mess {
   isMonthActive    Boolean        @default(false)
   currentMonthId   String?
   monthlyData      MonthlyData[]
-  requestStartTime String         @default("17:00") // Time when next day request opens
-  lunchEndTime     String         @default("02:00") // Cutoff for Lunch
-  dinnerEndTime    String         @default("12:00") // Cutoff for Dinner
+  requestStartTime String         @default("17:00")
+  lunchEndTime     String         @default("02:00")
+  dinnerEndTime    String         @default("12:00")
+  learnedPatterns  LearnedBazaarPattern[]
   createdAt        DateTime       @default(now())
 }
 
@@ -159,4 +160,22 @@ model SystemMetricSummary {
   createdAt        DateTime     @default(now())
 
   @@index([periodKey])
+}
+
+model LearnedBazaarPattern {
+  id            String   @id @default(uuid())
+  rawPhrase     String   // e.g. "shorishar tel", "kacha kola", "bilati begun"
+  canonicalName String   // e.g. "Shorishar Tel (সরিষার তেল)"
+  defaultUnit   String   @default("kg")
+  messId        String?  // null হলে সবার জন্য গ্লোবাল, messId থাকলে নির্দিষ্ট মেসের জন্য
+  mess          Mess?    @relation(fields: [messId], references: [id], onDelete: Cascade)
+  confidence    Float    @default(0.95)
+  hitCount      Int      @default(1)
+  learnedFrom   String   @default("AI_GEMINI") // "AI_GEMINI" | "USER_MANUAL_CORRECTION"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([rawPhrase, messId])
+  @@index([rawPhrase])
+  @@index([messId])
 }
